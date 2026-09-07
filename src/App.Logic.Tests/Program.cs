@@ -354,6 +354,39 @@ var nativePreviewHostSource = File.ReadAllText(Path.Combine(sourceDirectory,
     "App", "Controls", "NativePreviewHost.cs"));
 var previewAttachmentCoordinatorSource = File.ReadAllText(Path.Combine(sourceDirectory,
     "App", "Controls", "PreviewAttachmentCoordinator.cs"));
+Equal(true,
+    mainViewModelSource.Contains(
+        "!_usbControlEnabled && !_wirelessControlEnabled &&",
+        StringComparison.Ordinal) &&
+    mainViewModelSource.Contains(
+        "if (_bluetoothControlEnabled) await DisableBluetoothControlAsync();",
+        StringComparison.Ordinal) &&
+    mainViewModelSource.Contains(
+        "private UsbTouchBridgeHost? GetReadyUsbControlBridge(string? targetUdid)",
+        StringComparison.Ordinal) &&
+    mainWindowSource.Contains(
+        "SendUsbKeyboardAsync(usbUsages, routeUdid)",
+        StringComparison.Ordinal),
+    "wired, wireless, and Bluetooth control modes remain mutually exclusive");
+Equal(true,
+    mainViewModelSource.Contains(
+        "if (!ReferenceEquals(_wirelessTouchBridge, bridge)) return;",
+        StringComparison.Ordinal) &&
+    mainViewModelSource.Contains(
+        "if (!ReferenceEquals(_usbTouchBridge, bridge)) return;",
+        StringComparison.Ordinal) &&
+    mainViewModelSource.Contains(
+        "_usbControlStopping = true;",
+        StringComparison.Ordinal),
+    "reverse-control bridge callbacks and shutdowns are instance-safe");
+Equal(true,
+    mainWindowSource.Contains(
+        "e.Kind == Controls.PreviewPointerKind.ButtonUp && _usbTouchPressed",
+        StringComparison.Ordinal) &&
+    mainWindowSource.Contains(
+        "SendUsbTouchAsync(\"up\", _lastUsbTouchPosition.X",
+        StringComparison.Ordinal),
+    "USB touch releases at the last valid position when the pointer leaves the image");
 Equal(true, mainWindowSource.Contains("MainPreviewHost.Deactivate();",
         StringComparison.Ordinal) &&
     nativePreviewHostSource.Contains(
@@ -375,6 +408,32 @@ Equal(true,
     nativePreviewHostSource.Contains("SetWindowRgn(_window, 0, true)",
         StringComparison.Ordinal),
     "full-screen previews use black WPF fill and a rectangular native surface");
+var previewKeyHandlerIndex = mainWindowSource.IndexOf(
+    "private void OnPreviewKeyDown", StringComparison.Ordinal);
+var mainEscapeGuardIndex = mainWindowSource.IndexOf(
+    "if (key == Key.Escape &&", previewKeyHandlerIndex,
+    StringComparison.Ordinal);
+var previewKeyboardRouteIndex = mainWindowSource.IndexOf(
+    "if (TryRoutePreviewKeyboardEvent", previewKeyHandlerIndex,
+    StringComparison.Ordinal);
+var nativeEscapeHandlerIndex = previewWindowSource.IndexOf(
+    "case WmKeyDown when wParam.ToInt32() == VkEscape && _isFullScreen:",
+    StringComparison.Ordinal);
+var nativeKeyboardRouteIndex = previewWindowSource.IndexOf(
+    "case WmKeyDown when IsPointerInputActive:", nativeEscapeHandlerIndex,
+    StringComparison.Ordinal);
+Equal(true,
+    previewKeyHandlerIndex >= 0 && mainEscapeGuardIndex > previewKeyHandlerIndex &&
+    previewKeyboardRouteIndex > mainEscapeGuardIndex &&
+    nativeEscapeHandlerIndex >= 0 && nativeKeyboardRouteIndex > nativeEscapeHandlerIndex,
+    "Escape exits full screen before reverse-control keyboard routing");
+Equal(true,
+    mainWindowSource.Contains(
+        "e.VirtualKey == 0x1B && _isFullScreen", StringComparison.Ordinal) &&
+    mainWindowSource.Contains(
+        "!isKeyUp && virtualKey == 0x1B && _isFullScreen",
+        StringComparison.Ordinal),
+    "captured and raw preview Escape events also exit full screen");
 Equal(true, WindowsAutoPlayGuard.ShouldCancel(
         WindowsAutoPlayGuard.QueryCancelAutoPlayMessage, captureActive: true),
     "active capture cancels Windows AutoPlay device claims");
@@ -1202,7 +1261,9 @@ Equal(false, mainWindowText.Contains("CloseMediaCastButton",
     "video casting preview has no redundant corner close button");
 
 var mainWindowCodePath = Path.Combine(sourceDirectory, "App", "MainWindow.xaml.cs");
+var appCodePath = Path.Combine(sourceDirectory, "App", "App.xaml.cs");
 var mainWindowCode = File.ReadAllText(mainWindowCodePath);
+var appCode = File.ReadAllText(appCodePath);
 var appProjectText = File.ReadAllText(Path.Combine(sourceDirectory,
     "App", "iPhoneMirror.App.csproj"));
 var bluetoothHidCode = File.ReadAllText(Path.Combine(sourceDirectory,
@@ -1211,6 +1272,12 @@ var bluetoothRoutesSource = File.ReadAllText(Path.Combine(sourceDirectory,
     "App", "Services", "BluetoothClientRouteTable.cs"));
 var bossKeyWindowVisibilityCode = File.ReadAllText(Path.Combine(sourceDirectory,
     "App", "Services", "BossKeyWindowVisibility.cs"));
+Equal(true,
+    mainWindowCode.Contains("app.RestoreUpdateSettings(snapshot);",
+        StringComparison.Ordinal) &&
+    appCode.Contains("UpdateSettings = snapshot.Clone();",
+        StringComparison.Ordinal),
+    "shortcut save failure restores the complete isolated settings snapshot");
 Equal(true,
     bluetoothHidCode.Contains("00002a22-0000-1000-8000-00805f9b34fb",
         StringComparison.OrdinalIgnoreCase) &&

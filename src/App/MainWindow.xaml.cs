@@ -525,24 +525,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
             app.UpdateSettings.BluetoothShortcutSchema = 5;
             if (!app.SaveUpdateSettings())
             {
-                app.UpdateSettings.BluetoothControlShortcutVirtualKey = snapshot.BluetoothControlShortcutVirtualKey;
-                app.UpdateSettings.BluetoothControlShortcutModifiers = snapshot.BluetoothControlShortcutModifiers;
-                app.UpdateSettings.BluetoothControlShortcutSchema = snapshot.BluetoothControlShortcutSchema;
-                app.UpdateSettings.BluetoothControlCenterShortcutVirtualKey = snapshot.BluetoothControlCenterShortcutVirtualKey;
-                app.UpdateSettings.BluetoothControlCenterShortcutModifiers = snapshot.BluetoothControlCenterShortcutModifiers;
-                app.UpdateSettings.BluetoothNotificationCenterShortcutVirtualKey = snapshot.BluetoothNotificationCenterShortcutVirtualKey;
-                app.UpdateSettings.BluetoothNotificationCenterShortcutModifiers = snapshot.BluetoothNotificationCenterShortcutModifiers;
-                app.UpdateSettings.BluetoothAppSwitcherShortcutVirtualKey = snapshot.BluetoothAppSwitcherShortcutVirtualKey;
-                app.UpdateSettings.BluetoothAppSwitcherShortcutModifiers = snapshot.BluetoothAppSwitcherShortcutModifiers;
-                app.UpdateSettings.BluetoothHomeShortcutVirtualKey = snapshot.BluetoothHomeShortcutVirtualKey;
-                app.UpdateSettings.BluetoothHomeShortcutModifiers = snapshot.BluetoothHomeShortcutModifiers;
-                app.UpdateSettings.BluetoothBossShortcutVirtualKey = snapshot.BluetoothBossShortcutVirtualKey;
-                app.UpdateSettings.BluetoothBossShortcutModifiers = snapshot.BluetoothBossShortcutModifiers;
-                app.UpdateSettings.BluetoothDockShortcutVirtualKey = snapshot.BluetoothDockShortcutVirtualKey;
-                app.UpdateSettings.BluetoothDockShortcutModifiers = snapshot.BluetoothDockShortcutModifiers;
-                app.UpdateSettings.BluetoothSiriShortcutVirtualKey = snapshot.BluetoothSiriShortcutVirtualKey;
-                app.UpdateSettings.BluetoothSiriShortcutModifiers = snapshot.BluetoothSiriShortcutModifiers;
-                app.UpdateSettings.BluetoothShortcutSchema = snapshot.BluetoothShortcutSchema;
+                app.RestoreUpdateSettings(snapshot);
                 _ = TryRegisterShortcutSet(previous, out _);
                 return LocalizationService.Get("ShortcutSettingsSaveFailed");
             }
@@ -600,15 +583,26 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         var sourceHeight = e.SourceHeight != 0 ? e.SourceHeight : _viewModel.SourceVideoHeight;
         if (e.Kind == Controls.PreviewPointerKind.Reset)
         {
-            if (_usbTouchPressed)
-                await _viewModel.SendUsbTouchAsync("up", _lastUsbTouchPosition.X, _lastUsbTouchPosition.Y);
+            var wasPressed = _usbTouchPressed;
             _usbTouchPressed = false;
+            if (wasPressed)
+                await _viewModel.SendUsbTouchAsync("up", _lastUsbTouchPosition.X,
+                    _lastUsbTouchPosition.Y, sourceUdid);
             return;
         }
         if (e.Kind is not (Controls.PreviewPointerKind.Move or
             Controls.PreviewPointerKind.ButtonDown or Controls.PreviewPointerKind.ButtonUp)) return;
         var mapped = MapPointerToNormalized(e, sourceWidth, sourceHeight);
-        if (mapped is null) return;
+        if (mapped is null)
+        {
+            if (e.Kind == Controls.PreviewPointerKind.ButtonUp && _usbTouchPressed)
+            {
+                _usbTouchPressed = false;
+                await _viewModel.SendUsbTouchAsync("up", _lastUsbTouchPosition.X,
+                    _lastUsbTouchPosition.Y, sourceUdid);
+            }
+            return;
+        }
         var position = BluetoothMouseOrientationMapper.MapNormalized(
             mapped.Value.X, mapped.Value.Y, sourceWidth, sourceHeight, e.Rotation,
             _viewModel.AppliedBluetoothPortraitMouseDirection,
@@ -621,9 +615,9 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
             return;
         var action = e.Kind == Controls.PreviewPointerKind.ButtonDown ? "down" :
             e.Kind == Controls.PreviewPointerKind.ButtonUp ? "up" : "move";
-        await _viewModel.SendUsbTouchAsync(action, position.X, position.Y);
-        _lastUsbTouchPosition = position;
         if (action == "up") _usbTouchPressed = false;
+        await _viewModel.SendUsbTouchAsync(action, position.X, position.Y, sourceUdid);
+        _lastUsbTouchPosition = position;
     }
 
     private static (double X, double Y)? MapPointerToNormalized(
@@ -1095,6 +1089,12 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
             ("scan_code", e.ScanCode), ("active_window", _activeControlWindow),
             ("selected_device", AppLog.Device(_viewModel.SelectedDevice?.Udid))));
         if (_activeControlWindow != 0) return;
+        if (e.Kind == Controls.PreviewKeyboardKind.Down &&
+            e.VirtualKey == 0x1B && _isFullScreen)
+        {
+            ToggleFullScreen();
+            return;
+        }
         HandleControlKeyboardInput(e, _viewModel.SelectedDevice?.Udid);
     }
 
@@ -1127,7 +1127,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
                 _controlModifierKeys.Clear();
                 _controlKeyboardModifiers = 0;
                 if (bluetoothTargetActive) await _viewModel.SendBluetoothKeyboardAsync(0, []);
-                if (usbTargetActive) await _viewModel.SendUsbKeyboardAsync([]);
+                if (usbTargetActive) await _viewModel.SendUsbKeyboardAsync([], routeUdid);
                 return;
             }
             // Raw Input is preferred on the main preview, but it is not
@@ -1155,7 +1155,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
             if (usbTargetActive)
             {
                 var usbUsages = usages.Concat(ModifierUsages(_controlModifierKeys)).ToArray();
-                await _viewModel.SendUsbKeyboardAsync(usbUsages);
+                await _viewModel.SendUsbKeyboardAsync(usbUsages, routeUdid);
             }
         }
         catch (Exception error)
@@ -1440,6 +1440,11 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         {
             if (!isKeyUp && !_registeredHotKeyIds.Contains(HotKeyId(shortcutAction)))
                 HandleConfiguredShortcut(shortcutAction);
+            return;
+        }
+        if (!isKeyUp && virtualKey == 0x1B && _isFullScreen)
+        {
+            ToggleFullScreen();
             return;
         }
         HandleControlKeyboardInput(new Controls.PreviewKeyboardEventArgs(
@@ -6436,6 +6441,17 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
         var key = ResolvePreviewKey(e);
+        // Full-screen dismissal must stay local to the preview window. When
+        // reverse control is active, the normal keyboard route would forward
+        // Escape to the phone and mark the event handled before this window
+        // could leave full screen.
+        if (key == Key.Escape &&
+            Keyboard.Modifiers == ModifierKeys.None && _isFullScreen)
+        {
+            ToggleFullScreen();
+            e.Handled = true;
+            return;
+        }
         if (TryGetShortcutAction(KeyInterop.VirtualKeyFromKey(key),
                 out var configuredAction))
         {
@@ -6480,7 +6496,6 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         var ctrl = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
         var shift = (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
         if (e.Key == Key.F11) _ = ToggleActiveFullScreenAsync();
-        else if (e.Key == Key.Escape && _isFullScreen) ToggleFullScreen();
         else if (e.Key == Key.F5) _ = _viewModel.RefreshAsync(forceDeviceEnumeration: true);
         else if (ctrl && e.Key == Key.R) RefreshPreview();
         else if (ctrl && shift && e.Key == Key.P) OnPreviewWindowClick(this, new RoutedEventArgs());
@@ -6722,9 +6737,9 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
             }
             else if (usage != 0 && usbTarget)
             {
-                await _viewModel.SendUsbKeyboardAsync([usage]);
+                await _viewModel.SendUsbKeyboardAsync([usage], target);
                 await Task.Delay(20);
-                await _viewModel.SendUsbKeyboardAsync([]);
+                await _viewModel.SendUsbKeyboardAsync([], target);
             }
             _viewModel.AddDiagnosticLog(AppLog.Event("system_shortcut_sent",
                 ("action", action.ToString()), ("device", AppLog.Device(target)),

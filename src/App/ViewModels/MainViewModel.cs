@@ -393,18 +393,22 @@ internal sealed class MainViewModel : INotifyPropertyChanged
     private bool CanEnableBluetoothControlFor(string? deviceUdid) =>
         !_bluetoothControlEnabled && !_bluetoothControlStarting &&
         !_bluetoothControlStopping && !IsBusy &&
-        !_usbControlEnabled && !_usbControlStarting && !_usbControlStopping &&
+        !_usbControlEnabled && !_wirelessControlEnabled &&
+        !_usbControlStarting && !_usbControlStopping &&
         !string.IsNullOrWhiteSpace(deviceUdid) &&
         _sessions.TryGet(deviceUdid, out var session) && IsSessionPresentable(session);
 
     private bool CanEnableUsbControlFor(DeviceViewModel? device) =>
-        !_usbControlEnabled && !_usbControlStarting && !_usbControlStopping &&
+        !_usbControlEnabled && !_wirelessControlEnabled &&
+        !_bluetoothControlStarting && !_bluetoothControlStopping &&
+        !_usbControlStarting && !_usbControlStopping &&
         device is not null && !device.IsMediaCast &&
         GetUsbControlBinding(device.Udid) is not null;
 
     private bool CanEnableWirelessControlFor(DeviceViewModel? device) =>
         !_wirelessControlEnabled && !_usbControlEnabled && !_usbControlStarting &&
-        !_usbControlStopping && device is not null &&
+        !_usbControlStopping && !_bluetoothControlStarting &&
+        !_bluetoothControlStopping && device is not null &&
         _identityResolver.Resolve(device).AppleUdid is not null;
 
     // AirPlay supplies the picture, but direct touch always goes through a
@@ -1243,12 +1247,13 @@ internal sealed class MainViewModel : INotifyPropertyChanged
     internal Task SendBluetoothKeyboardAsync(byte modifiers, IReadOnlyCollection<byte> usages) =>
         _bluetoothControl.SendKeyboardAsync(modifiers, usages);
 
-    internal async Task SendUsbKeyboardAsync(IReadOnlyCollection<byte> usages)
+    internal async Task SendUsbKeyboardAsync(IReadOnlyCollection<byte> usages,
+        string? targetUdid)
     {
-        var bridge = _usbTouchBridge is { IsReady: true } ? _usbTouchBridge :
-            _wirelessTouchBridge is { IsReady: true } ? _wirelessTouchBridge : null;
+        var bridge = GetReadyUsbControlBridge(targetUdid);
         AddDiagnosticLog(AppLog.Event("usb_keyboard_send_begin",
             ("usages", string.Join(',', usages)),
+            ("device", AppLog.Device(targetUdid)),
             ("usb_bridge_ready", _usbTouchBridge?.IsReady ?? false),
             ("wireless_bridge_ready", _wirelessTouchBridge?.IsReady ?? false),
             ("usb_target", AppLog.Device(_usbControlDeviceUdid)),
@@ -1256,7 +1261,8 @@ internal sealed class MainViewModel : INotifyPropertyChanged
         if (bridge is null)
         {
             AddDiagnosticLog(AppLog.Event("usb_keyboard_send_skipped",
-                ("reason", "no_ready_bridge")));
+                ("reason", "target_bridge_not_ready"),
+                ("device", AppLog.Device(targetUdid))));
             return;
         }
         try
@@ -1458,6 +1464,7 @@ internal sealed class MainViewModel : INotifyPropertyChanged
     private bool CanStartReverseBluetoothPeripheral =>
         !_bluetoothControlEnabled && !_bluetoothControlStarting &&
         !_bluetoothControlStopping && !IsBusy && !_usbControlEnabled &&
+        !_wirelessControlEnabled &&
         !_usbControlStarting && !_usbControlStopping;
 
     internal bool IsBluetoothReverseControlEnabled => _bluetoothControlEnabled;
@@ -1770,15 +1777,11 @@ internal sealed class MainViewModel : INotifyPropertyChanged
             DeviceViewModel.UdidEquals(d.Udid, mirrorDeviceId))).AppleUdid;
 
     internal async Task SendUsbTouchAsync(string action, double normalizedX,
-        double normalizedY, CancellationToken cancellationToken = default)
+        double normalizedY, string? targetUdid,
+        CancellationToken cancellationToken = default)
     {
-        // Select only a ready bridge. During a transport switch the old USB
-        // process can still be referenced while the wireless process is
-        // already ready; sending to the stale instance drops the gesture.
-        var bridge = _usbTouchBridge is { IsReady: true } ? _usbTouchBridge :
-            _wirelessTouchBridge is { IsReady: true } ? _wirelessTouchBridge : null;
-        if ((!_usbControlEnabled || !_usbControlConnected) &&
-            (!_wirelessControlEnabled || !_wirelessControlConnected) || bridge is null ||
+        var bridge = GetReadyUsbControlBridge(targetUdid);
+        if (bridge is null ||
             !CoreDeviceTouchProtocol.IsNormalizedCoordinate(normalizedX) ||
             !CoreDeviceTouchProtocol.IsNormalizedCoordinate(normalizedY)) return;
         var point = new TouchPoint(1, action, normalizedX, normalizedY);
@@ -1786,6 +1789,17 @@ internal sealed class MainViewModel : INotifyPropertyChanged
             DateTimeOffset.UtcNow.ToUnixTimeNanoseconds(),
             Interlocked.Increment(ref _usbTouchSequence), cancellationToken);
     }
+
+    private UsbTouchBridgeHost? GetReadyUsbControlBridge(string? targetUdid) =>
+        _usbControlEnabled && _usbControlConnected &&
+        _usbTouchBridge is { IsReady: true } usbBridge &&
+        DeviceViewModel.UdidEquals(_usbControlDeviceUdid, targetUdid)
+            ? usbBridge
+            : _wirelessControlEnabled && _wirelessControlConnected &&
+              _wirelessTouchBridge is { IsReady: true } wirelessBridge &&
+              DeviceViewModel.UdidEquals(_wirelessControlDeviceUdid, targetUdid)
+                ? wirelessBridge
+                : null;
 
     internal async Task ToggleUsbControlAsync()
     {
@@ -1851,8 +1865,10 @@ internal sealed class MainViewModel : INotifyPropertyChanged
             ("device", AppLog.Device(device.Udid)), ("apple_device", AppLog.Device(boundUdid)));
         NotifyUsbControlStateChanged();
         var bridge = new UsbTouchBridgeHost();
+        _wirelessTouchBridge = bridge;
         bridge.StatusChanged += (_, bridgeEvent) =>
         {
+            if (!ReferenceEquals(_wirelessTouchBridge, bridge)) return;
             LogBridgeEvent("wireless", bridgeEvent);
             UpdateReverseControlStartupStatus(LocalizationService.Get("ReverseControlTransportWireless"), bridgeEvent);
             if (bridgeEvent.EventName is not ("error" or "status") ||
@@ -1866,6 +1882,7 @@ internal sealed class MainViewModel : INotifyPropertyChanged
         var lockdownGateHeld = false;
         try
         {
+            if (_bluetoothControlEnabled) await DisableBluetoothControlAsync();
             _usbControlStatus = LocalizationService.Get("ReverseControlConnectingWireless");
             NotifyUsbControlStateChanged();
             var bridgePath = Path.Combine(AppContext.BaseDirectory, "tools", "iUsbBridge.exe");
@@ -1875,7 +1892,6 @@ internal sealed class MainViewModel : INotifyPropertyChanged
             lockdownGateHeld = true;
             await bridge.StartAsync(UsbTouchTransport.Wireless, boundUdid, bridgePath,
                 _shutdownCancellation.Token);
-            _wirelessTouchBridge = bridge;
             _wirelessControlEnabled = _wirelessControlConnected = true;
             _wirelessControlDeviceUdid = device.Udid;
             _reverseInputRouter.Begin(boundUdid, ReverseControlMode.Wireless);
@@ -1888,6 +1904,7 @@ internal sealed class MainViewModel : INotifyPropertyChanged
         }
         catch (Exception error)
         {
+            if (ReferenceEquals(_wirelessTouchBridge, bridge)) _wirelessTouchBridge = null;
             await bridge.DisposeAsync();
             _usbControlStatus = LocalizationService.Format("ReverseControlWirelessFailedFormat", GetUsbControlFailureMessage(error, bridge));
             ShowReverseControlError(LocalizationService.Get("ReverseControlTransportWireless"), GetUsbControlFailureMessage(error, bridge));
@@ -1905,6 +1922,10 @@ internal sealed class MainViewModel : INotifyPropertyChanged
 
     private async Task DisableWirelessControlAsync()
     {
+        if (_usbControlStopping) return;
+        if (!_wirelessControlEnabled && _wirelessTouchBridge is null) return;
+        _usbControlStopping = true;
+        NotifyUsbControlStateChanged();
         var bridge = _wirelessTouchBridge;
         _wirelessTouchBridge = null;
         _wirelessControlEnabled = _wirelessControlConnected = false;
@@ -1925,7 +1946,11 @@ internal sealed class MainViewModel : INotifyPropertyChanged
                 ("error", AppLog.Error(error)));
             ShowReverseControlError(LocalizationService.Get("ReverseControlTransportWireless"), LocalizationService.Format("ReverseControlStopFailureDetailFormat", error.Message));
         }
-        finally { NotifyUsbControlStateChanged(); }
+        finally
+        {
+            _usbControlStopping = false;
+            NotifyUsbControlStateChanged();
+        }
     }
 
     private async Task EnableUsbControlAsync()
@@ -1933,7 +1958,6 @@ internal sealed class MainViewModel : INotifyPropertyChanged
         var device = SelectedDevice;
         if (!CanEnableUsbControlFor(device)) return;
         if (!ConfirmReverseControlPrerequisites(wireless: false)) return;
-        if (_bluetoothControlEnabled) await DisableBluetoothControlAsync();
         if (device is null) return;
         var boundUsbUdid = GetUsbControlBinding(device.Udid);
         if (string.IsNullOrWhiteSpace(boundUsbUdid)) return;
@@ -1945,8 +1969,10 @@ internal sealed class MainViewModel : INotifyPropertyChanged
             ("device", AppLog.Device(device.Udid)), ("apple_device", AppLog.Device(boundUsbUdid)));
         NotifyUsbControlStateChanged();
         var bridge = new UsbTouchBridgeHost();
+        _usbTouchBridge = bridge;
         bridge.StatusChanged += (_, bridgeEvent) =>
         {
+            if (!ReferenceEquals(_usbTouchBridge, bridge)) return;
             LogBridgeEvent("usb", bridgeEvent);
             UpdateReverseControlStartupStatus(LocalizationService.Get("ReverseControlTransportWired"), bridgeEvent);
             if (bridgeEvent.EventName is not ("error" or "status") ||
@@ -1959,6 +1985,7 @@ internal sealed class MainViewModel : INotifyPropertyChanged
         var lockdownGateHeld = false;
         try
         {
+            if (_bluetoothControlEnabled) await DisableBluetoothControlAsync();
             var bridgePath = GetUsbDirectControlBridgePath();
             // Bind the AirPlay mirror session to exactly one trusted USB
             // device. Never let the bridge choose the first connected phone.
@@ -1966,7 +1993,6 @@ internal sealed class MainViewModel : INotifyPropertyChanged
             lockdownGateHeld = true;
             await bridge.StartAsync(UsbTouchTransport.Usb, boundUsbUdid, bridgePath,
                 _shutdownCancellation.Token);
-            _usbTouchBridge = bridge;
             _usbControlEnabled = true;
             _usbControlFailed = false;
             _usbControlConnected = true;
@@ -1985,6 +2011,7 @@ internal sealed class MainViewModel : INotifyPropertyChanged
         }
         catch (Exception error)
         {
+            if (ReferenceEquals(_usbTouchBridge, bridge)) _usbTouchBridge = null;
             await bridge.DisposeAsync();
             var message = GetUsbControlFailureMessage(error, bridge);
             _usbControlFailed = true;
@@ -2206,6 +2233,7 @@ internal sealed class MainViewModel : INotifyPropertyChanged
 
     internal async Task DisableUsbControlAsync()
     {
+        if (_usbControlStopping) return;
         if (!_usbControlEnabled && _wirelessControlEnabled)
         {
             await DisableWirelessControlAsync();
@@ -2261,7 +2289,13 @@ internal sealed class MainViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(WiredControlActionText));
         OnPropertyChanged(nameof(WirelessControlActionText));
         OnPropertyChanged(nameof(UsbControlTargetUdid));
+        OnPropertyChanged(nameof(CanStartBluetoothControl));
+        OnPropertyChanged(nameof(CanStopBluetoothControl));
+        OnPropertyChanged(nameof(CanToggleBluetoothControl));
         ToggleUsbControlCommand.NotifyCanExecuteChanged();
+        StartBluetoothControlCommand.NotifyCanExecuteChanged();
+        StopBluetoothControlCommand.NotifyCanExecuteChanged();
+        ToggleBluetoothControlCommand.NotifyCanExecuteChanged();
     }
 
     private void NotifyBluetoothControlStateChanged()

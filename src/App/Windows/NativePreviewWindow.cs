@@ -773,6 +773,16 @@ internal sealed class NativePreviewWindow : IDisposable
                 // stream while the main window receives WM_HOTKEY.
                 handled = true;
                 return 0;
+            case WmKeyDown when wParam.ToInt32() == VkF11:
+                handled = true;
+                ToggleFullScreen();
+                return 0;
+            case WmKeyDown when wParam.ToInt32() == VkEscape && _isFullScreen:
+                // Escape exits the preview window's full-screen mode even
+                // while reverse control is forwarding other key presses.
+                handled = true;
+                ToggleFullScreen();
+                return 0;
             case WmKeyDown when IsPointerInputActive:
                 _keyboardInput?.Invoke(new PreviewKeyboardEventArgs(
                     PreviewKeyboardKind.Down, wParam.ToInt32(),
@@ -832,14 +842,6 @@ internal sealed class NativePreviewWindow : IDisposable
             case WmClose:
                 handled = true;
                 QueueClose();
-                return 0;
-            case WmKeyDown when wParam.ToInt32() == VkF11:
-                handled = true;
-                ToggleFullScreen();
-                return 0;
-            case WmKeyDown when wParam.ToInt32() == VkEscape && _isFullScreen:
-                handled = true;
-                ToggleFullScreen();
                 return 0;
             case WmSysKeyDown when wParam.ToInt32() == VkReturn && GetKeyState(VkMenu) < 0:
                 handled = true;

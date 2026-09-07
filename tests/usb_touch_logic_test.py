@@ -1286,6 +1286,40 @@ class TestOptionalDisplayService(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(any(event['event'] == 'ready' for event in ipc.events))
 
 
+class TestTouchSessionCleanup(unittest.IsolatedAsyncioTestCase):
+    async def test_direct_hid_cleanup_does_not_require_indigo(self):
+        import usb_touch_bridge as bridge
+
+        class Ipc:
+            async def emit(self, _event):
+                pass
+
+        class Hid:
+            def __init__(self):
+                self.reports = []
+                self.exited = False
+
+            async def send_report(self, service_id, report):
+                self.reports.append((service_id, report))
+
+            async def __aexit__(self, _type, _value, _traceback):
+                self.exited = True
+
+        session = bridge.TouchSession(Ipc(), 120, udid='trusted-device')
+        hid = Hid()
+        session.hid = hid
+        session._owns_hid = True
+
+        await session._cleanup()
+
+        self.assertEqual(len(hid.reports), bridge.MAX_SLOTS)
+        self.assertTrue(all(service_id == bridge.DIGITIZER_SURFACE_MAIN_TOUCHSCREEN
+                            for service_id, _ in hid.reports))
+        self.assertTrue(hid.exited)
+        self.assertIsNone(session.hid)
+        self.assertFalse(session._owns_hid)
+
+
 class TestWifiSyncProvisioning(unittest.IsolatedAsyncioTestCase):
     async def test_missing_wifi_sync_value_is_treated_as_disabled(self):
         import usb_touch_bridge as bridge

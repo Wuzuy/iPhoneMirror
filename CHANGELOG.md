@@ -5,6 +5,31 @@ All notable changes to iPhoneMirror are documented here. The project follows
 
 ## [Unreleased]
 
+## [1.8.4-test4] - 2026-09-07
+
+### Changed
+
+- Improve wired and wireless reverse-control routing so touch and keyboard
+  events stay bound to the selected device and stale bridge callbacks cannot
+  affect a newer control session.
+- Keep wired, wireless, and Bluetooth control modes mutually exclusive while
+  transitions are in progress.
+
+### Fixed
+
+- Add a RemotePairing fallback for older iOS versions.
+- Release USB touch input at the last valid position when the pointer leaves
+  the mirrored preview.
+- Make Escape reliably exit full-screen previews before reverse-control
+  keyboard routing handles the key.
+- Restore the complete shortcut-settings snapshot when saving fails.
+
+### Verification
+
+- Extend application-logic and USB bridge tests for device-targeted routing,
+  callback lifetime, input release, full-screen Escape handling, and settings
+  rollback.
+
 ## [1.8.3] - 2026-09-06
 
 ### Fixed
@@ -1510,7 +1535,8 @@ First public preview.
 - The first-time driver path still needs broader clean-machine validation.
 - Apple uses a private protocol and may change it in future iOS releases.
 
-[Unreleased]: https://github.com/RayrenSX/iPhoneMirror/compare/v1.8.3...HEAD
+[Unreleased]: https://github.com/RayrenSX/iPhoneMirror/compare/v1.8.4-test4...HEAD
+[1.8.4-test4]: https://github.com/RayrenSX/iPhoneMirror/compare/v1.8.3...v1.8.4-test4
 [1.8.3]: https://github.com/RayrenSX/iPhoneMirror/compare/v1.8.2...v1.8.3
 [1.8.2]: https://github.com/RayrenSX/iPhoneMirror/compare/v1.8.1...v1.8.2
 [1.8.1]: https://github.com/RayrenSX/iPhoneMirror/compare/v1.8.0...v1.8.1

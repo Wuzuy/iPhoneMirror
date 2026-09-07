@@ -215,6 +215,12 @@ public partial class App : Application
         }
     }
 
+    internal void RestoreUpdateSettings(UpdateSettings snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        UpdateSettings = snapshot.Clone();
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
         if (IsUiPreviewMode)

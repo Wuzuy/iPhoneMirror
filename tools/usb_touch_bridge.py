@@ -1150,6 +1150,7 @@ class TouchSession:
         self.transport = None
         self.auth_mode: Optional[str] = None
         self.gate_open = False
+        self._owns_hid = False
         self._ddi_was_mounted = False
         self._ddi_refresh_attempted = False
         self._remote_pairing_provision_attempted = False
@@ -1745,6 +1746,7 @@ class TouchSession:
                 continue
 
             self.hid = hid
+            self._owns_hid = True
             await self.ipc.emit({'event': 'status', 'code': 'hid_service_selected',
                                  'message': hid.SERVICE_NAME})
             return
@@ -2025,16 +2027,18 @@ class TouchSession:
             except Exception:
                 pass
             self.indigo = None
+        if self.hid is not None:
             try:
                 for slot in range(MAX_SLOTS):
                     report = build_touchscreen_report(slot, TOUCHSCREEN_STATE_RELEASE, 0, 0)
                     await self.hid.send_report(DIGITIZER_SURFACE_MAIN_TOUCHSCREEN, report)
             except Exception:
                 pass
-            try:
-                await self.hid.__aexit__(None, None, None)
-            except Exception:
-                pass
+            if self._owns_hid:
+                try:
+                    await self.hid.__aexit__(None, None, None)
+                except Exception:
+                    pass
         if self.drain_task is not None:
             self.drain_task.cancel()
             try:
@@ -2075,6 +2079,7 @@ class TouchSession:
             except Exception:
                 pass
         self.hid = None
+        self._owns_hid = False
         self.rsd = None
         self.display = None
         self.dial_plane = None

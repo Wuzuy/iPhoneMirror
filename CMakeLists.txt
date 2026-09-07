@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(iPhoneMirror VERSION 1.8.3 LANGUAGES CXX)
+project(iPhoneMirror VERSION 1.8.4 LANGUAGES CXX)
 
 set(IPHONEMIRROR_VERSION "${PROJECT_VERSION}" CACHE STRING
     "Product version embedded in native binaries")
