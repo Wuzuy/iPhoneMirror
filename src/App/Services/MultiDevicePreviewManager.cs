@@ -18,6 +18,8 @@ internal sealed class MultiDevicePreviewManager : IDisposable
         new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, ProtectedContentPresentation> _protectionStates =
         new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _sessionRecoveries =
+        new(StringComparer.OrdinalIgnoreCase);
     private bool _disposing;
     private bool _disposed;
 
@@ -38,6 +40,7 @@ internal sealed class MultiDevicePreviewManager : IDisposable
             ((udid, _) => viewModel.BluetoothControlIsInputEnabled &&
                 viewModel.IsBluetoothControlTarget(udid));
         viewModel.DeviceSessionHandleChanged += OnDeviceSessionHandleChanged;
+        viewModel.DeviceSessionRecoveryStateChanged += OnDeviceSessionRecoveryStateChanged;
         viewModel.DeviceProtectionStateChanged += OnDeviceProtectionStateChanged;
         LocalizationService.LanguageChanged += OnLanguageChanged;
     }
@@ -186,9 +189,10 @@ internal sealed class MultiDevicePreviewManager : IDisposable
                 !ReferenceEquals(tracked, window)) return;
             _windows.Remove(device.Udid);
             PreviewClosed?.Invoke(device.Udid);
+            var closingHandle = window.SessionHandle;
             viewModel.AddDiagnosticLog(AppLog.Event("independent_preview_closed",
                 ("device", AppLog.Device(device.Udid)),
-                ("handle", AppLog.Handle(started.Handle)),
+                ("handle", AppLog.Handle(closingHandle)),
                 ("created_session", started.Created),
                 ("disposing", _disposing)));
             if (_disposing || !started.Created) return;
@@ -197,7 +201,7 @@ internal sealed class MultiDevicePreviewManager : IDisposable
                 // The selected-main check is performed under the same core
                 // gate that revokes the handle, closing the selection race.
                 await viewModel.StopDeviceSessionAsync(
-                    device.Udid, started.Handle, preserveIfSelected: true);
+                    device.Udid, closingHandle, preserveIfSelected: true);
             }
             catch (Exception error)
             {
@@ -216,9 +220,25 @@ internal sealed class MultiDevicePreviewManager : IDisposable
     private void OnDeviceSessionHandleChanged(string udid, ulong handle)
     {
         _protectionStates.Remove(udid);
-        if (!_windows.TryGetValue(udid, out var window) ||
-            window.SessionHandle == handle)
+        if (!_windows.TryGetValue(udid, out var window))
             return;
+
+        if (handle == 0 && _sessionRecoveries.Contains(udid))
+        {
+            viewModel.AddDiagnosticLog(AppLog.Event(
+                "independent_preview_recovery_pending",
+                ("device", AppLog.Device(udid)),
+                ("old_handle", AppLog.Handle(window.SessionHandle))));
+            return;
+        }
+
+        if (handle != 0 && _sessionRecoveries.Contains(udid) &&
+            window.RebindSession(handle))
+        {
+            return;
+        }
+        if (window.SessionHandle == handle) return;
+
         _windows.Remove(udid);
         PreviewClosed?.Invoke(udid);
         viewModel.AddDiagnosticLog(AppLog.Event("independent_preview_handle_invalidated",
@@ -238,6 +258,34 @@ internal sealed class MultiDevicePreviewManager : IDisposable
                 DiagnosticLogger.Exception("window", "preview_dispose_ui_failed",
                     uiError, ("device", AppLog.Device(udid)));
             }
+        }
+    }
+
+    private void OnDeviceSessionRecoveryStateChanged(string udid, bool recovering)
+    {
+        if (recovering)
+        {
+            _sessionRecoveries.Add(udid);
+            return;
+        }
+
+        _sessionRecoveries.Remove(udid);
+        if (viewModel.GetDeviceSessionHandle(udid) != 0 ||
+            !_windows.TryGetValue(udid, out var window)) return;
+
+        _windows.Remove(udid);
+        PreviewClosed?.Invoke(udid);
+        viewModel.AddDiagnosticLog(AppLog.Event(
+            "independent_preview_recovery_failed",
+            ("device", AppLog.Device(udid)),
+            ("old_handle", AppLog.Handle(window.SessionHandle))));
+        try { window.Dispose(); }
+        catch (Exception error)
+        {
+            viewModel.AddDiagnosticLog(AppLog.Event(
+                "independent_preview_dispose_failed",
+                ("handle", AppLog.Handle(window.SessionHandle)),
+                ("error", AppLog.Error(error))));
         }
     }
 
@@ -331,6 +379,7 @@ internal sealed class MultiDevicePreviewManager : IDisposable
         viewModel.AddDiagnosticLog(AppLog.Event("independent_preview_manager_dispose",
             ("count", _windows.Count)));
         viewModel.DeviceSessionHandleChanged -= OnDeviceSessionHandleChanged;
+        viewModel.DeviceSessionRecoveryStateChanged -= OnDeviceSessionRecoveryStateChanged;
         viewModel.DeviceProtectionStateChanged -= OnDeviceProtectionStateChanged;
         LocalizationService.LanguageChanged -= OnLanguageChanged;
         foreach (var window in _windows.Values.ToArray())
@@ -345,6 +394,7 @@ internal sealed class MultiDevicePreviewManager : IDisposable
             }
         }
         _windows.Clear();
+        _sessionRecoveries.Clear();
         _protectionStates.Clear();
     }
 }

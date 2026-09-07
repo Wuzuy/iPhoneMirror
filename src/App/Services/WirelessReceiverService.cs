@@ -83,6 +83,8 @@ internal static class WirelessReceiverConfiguration
         "bin\\dnssd.dll",
         "lib\\gstreamer-1.0\\libgstapp.dll",
         "lib\\gstreamer-1.0\\libgstcoreelements.dll",
+        "lib\\gstreamer-1.0\\libgstplayback.dll",
+        "lib\\gstreamer-1.0\\libgstautodetect.dll",
         "lib\\gstreamer-1.0\\libgstaudioconvert.dll",
         "lib\\gstreamer-1.0\\libgstaudioresample.dll",
         "lib\\gstreamer-1.0\\libgstvideoconvertscale.dll",

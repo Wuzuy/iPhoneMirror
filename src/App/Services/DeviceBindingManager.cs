@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.IO;
+using IPhoneMirror.App.Localization;
 
 namespace IPhoneMirror.App.Services;
 
@@ -46,11 +47,14 @@ internal sealed class DeviceBindingManager
         DeviceIdentityType type, string stableId, DeviceFingerprint? fingerprint)
     {
         if (string.IsNullOrWhiteSpace(stableId))
-            return new(false, null, "设备身份不能为空。");
+            return new(false, null, LocalizationService.GetOrDefault(
+                "DeviceBindingIdentityRequired", "A device identity is required."));
         lock (_gate)
         {
             if (_profiles.Values.Any(profile => Matches(profile, type, stableId)))
-                return new(false, null, "该设备身份已经绑定到设备档案。");
+                return new(false, null, LocalizationService.GetOrDefault(
+                    "DeviceBindingIdentityAlreadyBound",
+                    "This device identity is already bound to a device profile."));
             var now = DateTime.UtcNow;
             var profile = type switch
             {
@@ -102,18 +106,30 @@ internal sealed class DeviceBindingManager
     internal BindIdentityResult Bind(Guid profileId, DeviceIdentityType type, string stableId,
         string? deviceName, DeviceFingerprint? fingerprint, bool userConfirmed = false)
     {
-        if (string.IsNullOrWhiteSpace(stableId)) return new(false, DeviceBindingCompatibility.Unknown, "设备身份不能为空。");
+        if (string.IsNullOrWhiteSpace(stableId)) return new(false,
+            DeviceBindingCompatibility.Unknown, LocalizationService.GetOrDefault(
+                "DeviceBindingIdentityRequired", "A device identity is required."));
         lock (_gate)
         {
-            if (!_profiles.TryGetValue(profileId, out var profile)) return new(false, DeviceBindingCompatibility.Unknown, "设备档案不存在。");
+            if (!_profiles.TryGetValue(profileId, out var profile)) return new(false,
+                DeviceBindingCompatibility.Unknown, LocalizationService.GetOrDefault(
+                    "DeviceBindingProfileNotFound", "The device profile was not found."));
             var owner = _profiles.Values.FirstOrDefault(candidate => candidate.Id != profileId && Matches(candidate, type, stableId));
-            if (owner is not null) return new(false, DeviceBindingCompatibility.Unknown, "该设备身份已绑定到另一台设备档案。");
+            if (owner is not null) return new(false, DeviceBindingCompatibility.Unknown,
+                LocalizationService.GetOrDefault("DeviceBindingIdentityBoundElsewhere",
+                    "This device identity is already bound to another device profile."));
             if (Matches(profile, type, stableId))
                 return new(true, DeviceBindingCompatibility.Confirmed);
             var compatibility = ValidateCompatibilityUnsafe(profile, fingerprint);
-            if (compatibility == DeviceBindingCompatibility.Incompatible) return new(false, compatibility, "检测到的设备型号不一致，无法绑定。");
+            if (compatibility == DeviceBindingCompatibility.Incompatible) return new(false,
+                compatibility, LocalizationService.GetOrDefault("DeviceBindingIncompatibleModel",
+                    "The detected device model does not match; it cannot be bound."));
             if (compatibility is DeviceBindingCompatibility.Compatible or DeviceBindingCompatibility.Unknown && !userConfirmed)
-                return new(false, compatibility, compatibility == DeviceBindingCompatibility.Compatible ? "设备型号一致，需要用户确认。" : "无法自动验证设备型号，需要用户确认。");
+                return new(false, compatibility, compatibility == DeviceBindingCompatibility.Compatible
+                    ? LocalizationService.GetOrDefault("DeviceBindingCompatibleNeedsConfirmation",
+                        "The device model matches, but user confirmation is required.")
+                    : LocalizationService.GetOrDefault("DeviceBindingUnknownNeedsConfirmation",
+                        "The device model could not be verified automatically; user confirmation is required."));
             var now = DateTime.UtcNow;
             var updated = type switch
             {
@@ -217,7 +233,7 @@ internal sealed class DeviceBindingManager
     }
 
     private static string NormalizeDisplayName(string displayName) =>
-        string.IsNullOrWhiteSpace(displayName) ? "未命名设备" : displayName.Trim();
+        string.IsNullOrWhiteSpace(displayName) ? string.Empty : displayName.Trim();
 }
 
 internal sealed class ReverseControlManager

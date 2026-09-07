@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
+using IPhoneMirror.App.Localization;
 using IPhoneMirror.App.Models;
 using IPhoneMirror.App.Services;
 using IPhoneMirror.App.ViewModels;
@@ -15,18 +16,21 @@ public sealed class ProfileListItem : INotifyPropertyChanged
     internal ProfileListItem(DeviceBindingProfile profile) => Profile = profile;
     internal DeviceBindingProfile Profile { get; private set; }
     public Guid Id => Profile.Id;
-    public string DisplayName => Profile.DisplayName;
+    public string DisplayName => string.IsNullOrWhiteSpace(Profile.DisplayName)
+        ? L("DeviceBindingUnnamedDevice") : Profile.DisplayName;
     public string DeviceName => FirstMeaningful(Profile.WiredIdentity?.DeviceName,
         Profile.AirPlayIdentity?.DeviceName, Profile.BluetoothIdentity?.DeviceName,
         Profile.DisplayName);
     public string ModelName => FirstMeaningful((Profile.WiredIdentity?.Fingerprint ??
         Profile.AirPlayIdentity?.Fingerprint ?? Profile.DeviceFingerprint)?.ProductName,
         (Profile.WiredIdentity?.Fingerprint ?? Profile.AirPlayIdentity?.Fingerprint ??
-        Profile.DeviceFingerprint)?.ProductType, "型号信息待获取");
+        Profile.DeviceFingerprint)?.ProductType, L("DeviceBindingModelUnknown"));
     internal void Update(DeviceBindingProfile profile) { Profile = profile; PropertyChanged?.Invoke(this, new(null)); }
+    internal void NotifyLanguageChanged() => PropertyChanged?.Invoke(this, new(null));
     public event PropertyChangedEventHandler? PropertyChanged;
+    private static string L(string key) => LocalizationService.Get(key);
     private static string FirstMeaningful(params string?[] values) => values.FirstOrDefault(value =>
-        !string.IsNullOrWhiteSpace(value))?.Trim() ?? "未命名设备";
+        !string.IsNullOrWhiteSpace(value))?.Trim() ?? L("DeviceBindingUnnamedDevice");
 }
 
 public partial class DeviceBindingWindow : Wpf.Ui.Controls.FluentWindow, INotifyPropertyChanged
@@ -50,12 +54,14 @@ public partial class DeviceBindingWindow : Wpf.Ui.Controls.FluentWindow, INotify
     public DeviceViewModel? SelectedAirPlayDevice { get => _selectedAirPlayDevice; set { _selectedAirPlayDevice = value; Notify(nameof(CanBindAirPlay)); } }
     public BluetoothClientInfo? SelectedBluetoothClient { get => _selectedBluetoothClient; set { _selectedBluetoothClient = value; Notify(nameof(CanBindBluetooth)); } }
     private DeviceBindingProfile? Profile => SelectedProfile?.Profile;
-    public string ProfileTitle => Profile?.DisplayName ?? "选择设备档案";
-    public string WiredStatus => Profile?.WiredIdentity is null ? "未绑定" : IsWiredConnected ? "已绑定 · 已连接" : "已绑定 · 当前不可用";
+    public string ProfileTitle => string.IsNullOrWhiteSpace(Profile?.DisplayName)
+        ? Profile is null ? L("DeviceBindingSelectProfile") : L("DeviceBindingUnnamedDevice")
+        : Profile.DisplayName;
+    public string WiredStatus => Profile?.WiredIdentity is null ? L("DeviceBindingBound") : IsWiredConnected ? L("DeviceBindingBoundConnected") : L("DeviceBindingBoundUnavailable");
     public string WiredIdentity => Profile?.WiredIdentity?.Udid ?? "";
-    public string AirPlayStatus => Profile?.AirPlayIdentity is null ? "未绑定" : IsAirPlayCurrent ? "已绑定 · 当前镜像" : "已绑定 · 当前不可用";
+    public string AirPlayStatus => Profile?.AirPlayIdentity is null ? L("DeviceBindingBound") : IsAirPlayCurrent ? L("DeviceBindingBoundMirroring") : L("DeviceBindingBoundUnavailable");
     public string AirPlayIdentity => Profile?.AirPlayIdentity?.StableId ?? "";
-    public string BluetoothStatus => Profile?.BluetoothIdentity is null ? "未绑定" : BluetoothClients.Any(client => string.Equals(client.Id, Profile.BluetoothIdentity.StableId, StringComparison.OrdinalIgnoreCase)) ? "已绑定 · 已连接" : "已绑定 · 已断开";
+    public string BluetoothStatus => Profile?.BluetoothIdentity is null ? L("DeviceBindingBound") : BluetoothClients.Any(client => string.Equals(client.Id, Profile.BluetoothIdentity.StableId, StringComparison.OrdinalIgnoreCase)) ? L("DeviceBindingBoundConnected") : L("DeviceBindingBoundDisconnected");
     public string BluetoothIdentity => Profile?.BluetoothIdentity?.StableId ?? "";
     public bool HasWiredBinding => Profile?.WiredIdentity is not null;
     public bool HasAirPlayBinding => Profile?.AirPlayIdentity is not null;
@@ -71,7 +77,12 @@ public partial class DeviceBindingWindow : Wpf.Ui.Controls.FluentWindow, INotify
     {
         Owner = owner; _sourceDevices = devices; _viewModel = viewModel;
         _sourceDevices.CollectionChanged += OnDevicesChanged;
-        Closed += (_, _) => _sourceDevices.CollectionChanged -= OnDevicesChanged;
+        LocalizationService.LanguageChanged += OnLanguageChanged;
+        Closed += (_, _) =>
+        {
+            _sourceDevices.CollectionChanged -= OnDevicesChanged;
+            LocalizationService.LanguageChanged -= OnLanguageChanged;
+        };
         CreateProfilesForConnectedUsbDevices();
         SynchronizeProfiles();
         DataContext = this; InitializeComponent();
@@ -91,7 +102,7 @@ public partial class DeviceBindingWindow : Wpf.Ui.Controls.FluentWindow, INotify
             device.Udid, GetFingerprint(device));
         if (!result.Success || result.Profile is null)
         {
-            MessageBox.Show(this, result.Error ?? "无法创建设备档案。", "设备绑定器",
+            MessageBox.Show(this, result.Error ?? L("DeviceBindingCreateFailed"), L("DeviceBindingTitle"),
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
@@ -103,14 +114,14 @@ public partial class DeviceBindingWindow : Wpf.Ui.Controls.FluentWindow, INotify
     {
         SelectProfileFromMenu(sender);
         if (Profile is null) return;
-        var name = Microsoft.VisualBasic.Interaction.InputBox("输入设备档案名称", "重命名设备", Profile.DisplayName);
+        var name = Microsoft.VisualBasic.Interaction.InputBox(L("DeviceBindingRenamePrompt"), L("DeviceBindingRenameTitle"), Profile.DisplayName);
         if (_manager.RenameProfile(Profile.Id, name)) SynchronizeProfiles();
     }
 
     private void DeleteProfileClick(object sender, RoutedEventArgs e)
     {
         SelectProfileFromMenu(sender);
-        if (Profile is null || MessageBox.Show(this, "删除该设备档案将解除所有已绑定的 USB、AirPlay 和 Bluetooth 身份。是否继续？", "删除设备档案", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        if (Profile is null || MessageBox.Show(this, L("DeviceBindingDeleteConfirmation"), L("DeviceBindingDeleteTitle"), MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
         if (_manager.DeleteProfile(Profile.Id)) { SynchronizeProfiles(); SelectedProfile = Profiles.FirstOrDefault(); }
     }
 
@@ -121,7 +132,7 @@ public partial class DeviceBindingWindow : Wpf.Ui.Controls.FluentWindow, INotify
         if (Profile is null || device is null) return;
         var result = _manager.Bind(Profile.Id, type, device.Udid, device.DisplayName, GetFingerprint(device));
         if (!result.Success && result.Compatibility is DeviceBindingCompatibility.Compatible or DeviceBindingCompatibility.Unknown &&
-            MessageBox.Show(this, result.Error + "\n\n确认这是同一台真实设备吗？", "确认设备绑定", MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
+            MessageBox.Show(this, F("DeviceBindingConfirmBodyFormat", result.Error), L("DeviceBindingConfirmTitle"), MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes)
             result = _manager.Bind(Profile.Id, type, device.Udid, device.DisplayName, GetFingerprint(device), true);
         if (result.Success) SynchronizeProfiles();
     }
@@ -134,13 +145,13 @@ public partial class DeviceBindingWindow : Wpf.Ui.Controls.FluentWindow, INotify
         var target = Profile.WiredIdentity?.Udid ?? Profile.AirPlayIdentity?.StableId;
         if (string.IsNullOrWhiteSpace(target))
         {
-            MessageBox.Show(this, "请先为该档案绑定 USB 或 AirPlay 设备。", "连接 Bluetooth",
+            MessageBox.Show(this, L("DeviceBindingUsbOrAirPlayRequired"), L("DeviceBindingConnect"),
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
         if (!await _viewModel.StartBluetoothPeripheralForConfigurationAsync(target))
         {
-            MessageBox.Show(this, "无法启动 Bluetooth HID 连接。请确认电脑蓝牙已开启。", "连接 Bluetooth",
+            MessageBox.Show(this, L("DeviceBindingBluetoothStartFailed"), L("DeviceBindingConnect"),
                 MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
@@ -156,7 +167,7 @@ public partial class DeviceBindingWindow : Wpf.Ui.Controls.FluentWindow, INotify
             }
             else
             {
-                MessageBox.Show(this, result.Error ?? "无法保存 Bluetooth 设备绑定。", "连接 Bluetooth",
+                MessageBox.Show(this, result.Error ?? L("DeviceBindingBluetoothSaveFailed"), L("DeviceBindingConnect"),
                     MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         }
@@ -213,8 +224,15 @@ public partial class DeviceBindingWindow : Wpf.Ui.Controls.FluentWindow, INotify
     }
     private static DeviceFingerprint GetFingerprint(DeviceViewModel device) => new(device.ProductType, device.ModelDisplay, null, null, device.OsVersion);
     private void CloseClick(object sender, RoutedEventArgs e) => Close();
+    private void OnLanguageChanged(object? sender, EventArgs e)
+    {
+        foreach (var profile in Profiles) profile.NotifyLanguageChanged();
+        NotifyAll();
+    }
     private void OnDevicesChanged(object? sender, NotifyCollectionChangedEventArgs e) => Dispatcher.InvokeAsync(() => { CreateProfilesForConnectedUsbDevices(); SynchronizeProfiles(); Notify(nameof(WiredDevices)); Notify(nameof(AirPlayDevices)); });
     private void NotifyAll() { Notify(nameof(ProfileTitle)); Notify(nameof(WiredStatus)); Notify(nameof(WiredIdentity)); Notify(nameof(AirPlayStatus)); Notify(nameof(AirPlayIdentity)); Notify(nameof(BluetoothStatus)); Notify(nameof(BluetoothIdentity)); Notify(nameof(HasWiredBinding)); Notify(nameof(HasAirPlayBinding)); Notify(nameof(CanEditWired)); Notify(nameof(CanEditAirPlay)); Notify(nameof(CanBindWired)); Notify(nameof(CanBindAirPlay)); Notify(nameof(CanBindBluetooth)); }
+    private static string L(string key) => LocalizationService.Get(key);
+    private static string F(string key, params object?[] args) => LocalizationService.Format(key, args);
     private void Notify([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new(name));
     public event PropertyChangedEventHandler? PropertyChanged;
 }

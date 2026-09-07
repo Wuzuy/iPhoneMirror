@@ -303,7 +303,11 @@ try {
     & $PidGenerator -Root $Root
     if (-not $?) { throw 'Apple mobile capture PID generation failed.' }
 
-    & $CMake --preset windows-x64
+    $cmakeConfigureArguments = @('--preset', 'windows-x64')
+    if (-not [string]::IsNullOrWhiteSpace($Version)) {
+        $cmakeConfigureArguments += "-DIPHONEMIRROR_VERSION=$Version"
+    }
+    & $CMake @cmakeConfigureArguments
     if ($LASTEXITCODE -ne 0) { throw "CMake configure failed: $LASTEXITCODE" }
 
     $BuildPreset = "windows-x64-$($Configuration.ToLowerInvariant())"

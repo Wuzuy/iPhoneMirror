@@ -10,9 +10,11 @@ internal enum WirelessStallRecoveryAction
 }
 
 /// <summary>
-/// Detects an AirPlay stream whose decoded frame and telemetry mailbox stopped
-/// advancing. The tracker is deliberately independent of WPF so the timing
-/// and retry policy can be tested without a live receiver.
+/// Detects an AirPlay stream whose decoded-frame identity stopped advancing.
+/// FPS and latency are diagnostic telemetry, not proof of a new frame; using
+/// them here would let a stalled decoder evade recovery. The tracker is
+/// deliberately independent of WPF so the timing and retry policy can be
+/// tested without a live receiver.
 /// </summary>
 internal sealed class WirelessStallRecoveryTracker
 {
@@ -24,8 +26,6 @@ internal sealed class WirelessStallRecoveryTracker
     private uint _height;
     private long _timestamp;
     private ulong _videoFrames;
-    private double _fps;
-    private double _latency;
     private DateTimeOffset _lastProgressAt;
     private DateTimeOffset _lastActionAt;
     private int _recoveryAttempts;
@@ -55,24 +55,18 @@ internal sealed class WirelessStallRecoveryTracker
             _height = status.Height;
             _timestamp = latestFrameTimestamp;
             _videoFrames = status.VideoFrames;
-            _fps = status.Fps;
-            _latency = status.LatencyMs;
             _lastProgressAt = now;
-            if (dimensionsChanged) _recoveryAttempts = 0;
+            if (handleChanged || dimensionsChanged) _recoveryAttempts = 0;
             _initialized = true;
             return WirelessStallRecoveryAction.None;
         }
 
         var advanced = latestFrameTimestamp != _timestamp ||
-            status.VideoFrames != _videoFrames ||
-            !NearlyEqual(status.Fps, _fps) ||
-            !NearlyEqual(status.LatencyMs, _latency);
+            status.VideoFrames != _videoFrames;
         if (advanced)
         {
             _timestamp = latestFrameTimestamp;
             _videoFrames = status.VideoFrames;
-            _fps = status.Fps;
-            _latency = status.LatencyMs;
             _lastProgressAt = now;
             return WirelessStallRecoveryAction.None;
         }
@@ -95,13 +89,10 @@ internal sealed class WirelessStallRecoveryTracker
         _width = _height = 0;
         _timestamp = 0;
         _videoFrames = 0;
-        _fps = _latency = 0;
         _lastProgressAt = default;
         _lastActionAt = default;
         _recoveryAttempts = 0;
         _initialized = false;
     }
 
-    private static bool NearlyEqual(double left, double right) =>
-        Math.Abs(left - right) < 0.01;
 }

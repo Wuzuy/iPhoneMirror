@@ -47,8 +47,9 @@ internal sealed class UpdateSettings
     public int BluetoothControlShortcutVirtualKey { get; set; } = 0x78;
     public int BluetoothControlShortcutModifiers { get; set; }
     public int BluetoothControlShortcutSchema { get; set; }
-    public int BluetoothModeShortcutVirtualKey { get; set; }
+    public int BluetoothModeShortcutVirtualKey { get; set; } = 0x78;
     public int BluetoothModeShortcutModifiers { get; set; }
+    public int BluetoothModeShortcutSchema { get; set; }
     public int WirelessModeShortcutVirtualKey { get; set; }
     public int WirelessModeShortcutModifiers { get; set; }
     public int WiredModeShortcutVirtualKey { get; set; }
@@ -61,9 +62,9 @@ internal sealed class UpdateSettings
     public int BluetoothControlCenterShortcutModifiers { get; set; }
     public int BluetoothNotificationCenterShortcutVirtualKey { get; set; }
     public int BluetoothNotificationCenterShortcutModifiers { get; set; }
-    public int BluetoothAppSwitcherShortcutVirtualKey { get; set; }
+    public int BluetoothAppSwitcherShortcutVirtualKey { get; set; } = (int)KeyboardShortcut.MouseMiddle;
     public int BluetoothAppSwitcherShortcutModifiers { get; set; }
-    public int BluetoothHomeShortcutVirtualKey { get; set; }
+    public int BluetoothHomeShortcutVirtualKey { get; set; } = (int)KeyboardShortcut.MouseRight;
     public int BluetoothHomeShortcutModifiers { get; set; }
     public int BluetoothBackShortcutVirtualKey { get; set; }
     public int BluetoothBackShortcutModifiers { get; set; }
@@ -125,6 +126,7 @@ internal sealed class UpdateSettings
         BluetoothControlShortcutSchema = BluetoothControlShortcutSchema,
         BluetoothModeShortcutVirtualKey = BluetoothModeShortcutVirtualKey,
         BluetoothModeShortcutModifiers = BluetoothModeShortcutModifiers,
+        BluetoothModeShortcutSchema = BluetoothModeShortcutSchema,
         WirelessModeShortcutVirtualKey = WirelessModeShortcutVirtualKey,
         WirelessModeShortcutModifiers = WirelessModeShortcutModifiers,
         WiredModeShortcutVirtualKey = WiredModeShortcutVirtualKey,
@@ -202,6 +204,7 @@ internal sealed class UpdateSettingsStore
                 BluetoothMouseSettingsSchema = 1,
                 BluetoothMouseDirectionSchema = 1,
                 BluetoothControlShortcutSchema = 1,
+                BluetoothModeShortcutSchema = 1,
                 BluetoothShortcutSchema = 6,
                 BluetoothHidReportMapVersion = BluetoothHidProtocol.ReportMapVersion,
                 BluetoothHidReportMapAcknowledgedVersion = BluetoothHidProtocol.ReportMapVersion,
@@ -288,6 +291,22 @@ internal sealed class UpdateSettingsStore
                 settings.BluetoothControlShortcutVirtualKey = 0x78;
                 settings.BluetoothControlShortcutModifiers = 0;
                 settings.BluetoothControlShortcutSchema = 1;
+            }
+            if (settings.BluetoothModeShortcutSchema < 1)
+            {
+                // Older builds persisted this field as zero even though the
+                // intended default shortcut is F9. Preserve valid custom
+                // shortcuts, but migrate the legacy zero value once.
+                if (!KeyboardShortcut.IsValid(settings.BluetoothModeShortcutModifiers,
+                        settings.BluetoothModeShortcutVirtualKey) ||
+                    settings.BluetoothModeShortcutVirtualKey == 0 &&
+                    settings.BluetoothModeShortcutModifiers == 0)
+                {
+                    settings.BluetoothModeShortcutVirtualKey = 0x78;
+                    settings.BluetoothModeShortcutModifiers = 0;
+                }
+                settings.BluetoothModeShortcutSchema = 1;
+                migrationChanged = true;
             }
             if (settings.BluetoothShortcutSchema < 3)
             {

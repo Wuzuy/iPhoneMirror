@@ -1749,11 +1749,28 @@ void test_wireless_multi_stream_isolation() {
     check(first->latest_frame()->nv12 != second->latest_frame()->nv12,
         "wireless client pixel buffers are isolated");
 
+    const auto frame_before_local_recovery = first->latest_frame();
+    first->detach();
+    first->attach(preferences);
+    const auto frame_after_local_recovery = first->latest_frame();
+    check(first->connected() && frame_before_local_recovery && frame_after_local_recovery &&
+            frame_before_local_recovery->timestamp_100ns ==
+                frame_after_local_recovery->timestamp_100ns &&
+            frame_before_local_recovery->nv12 == frame_after_local_recovery->nv12,
+        "local wireless session recovery keeps the last frame visible");
+    auto replacement_i420 = first_i420;
+    replacement_i420[0] = 200;
+    first->publish_video(first_header, replacement_i420);
+    check(first->latest_frame() && first->latest_frame()->nv12.front() == 200,
+        "wireless session recovery accepts a replacement frame without reconnecting");
+
+    const auto video_frames_before_disconnect = first->snapshot().video_frames;
     first->set_identity(L"First iPhone", false);
     check(first->snapshot().width == 0 && second->snapshot().width == 2,
         "disconnect clears only the matching wireless client");
     first->publish_video(first_header, first_i420);
-    check(first->snapshot().video_frames == 1 && first->latest_frame() == nullptr,
+    check(first->snapshot().video_frames == video_frames_before_disconnect &&
+            first->latest_frame() == nullptr,
         "late frames after disconnect cannot repopulate the wireless client");
     first->detach();
     second->detach();

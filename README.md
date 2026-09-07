@@ -281,11 +281,31 @@ App 发送的播放地址进入主窗口内的专用播放界面，两条播放�
 | AirPlayServer 1.1.2 | 无线 AirPlay 接收、FairPlay/视频/音频解码 | GPL-3.0、LGPL-2.1-or-later 及上游许可证，见 `third_party/airplay-server/` |
 | FFmpeg 4.4.2 runtime | AirPlayServer 内置 H.264/音频运行库 | LGPL-2.1-or-later，随 AirPlayServer 发行物提供 |
 | FFmpeg 8.1.2 runtime | 录制、直播推流和视频投屏 HLS 桥接 | GPL-3.0，默认随 `tools/ffmpeg/` 发布 |
+| iUsbBridge | 当前构建与发布使用的 USBMux 有线/无线反向控制桥接器 | [RayrenSX/iUsbBridge](https://github.com/RayrenSX/iUsbBridge) 的 iUsbBridge 非商业使用许可；不是 OSI 定义的开源许可证 |
 | quicktime_video_hack fixtures | QuickTime 协议回归测试向量 | MIT，仅用于 `src/Core/tests/fixtures/` |
 
 Apple Devices、Apple Mobile Device Support、iTunes 和 Windows 系统组件均不是本项目
 重新分发的第三方软件。完整版权、来源、版本、哈希和许可证说明见
 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) 与 AirPlayServer 的 `SOURCE.md`。
+
+### USBMux 有线投屏与有线反控的参考项目
+
+早期验证 USBMux 同时承载有线投屏和有线反向控制时，借用ai工具曾找到
+[xiaozai-van-liu/iPhoneUsbTouch](https://gitee.com/xiaozai-van-liu/iPhoneUsbTouch)。该项目是
+本项目 USBMux 有线投屏链路的实际来源之一：当前仓库
+`tools/iostouch/qt/usb.py`、`tools/iostouch/qt/usbmux_usb.py` 和
+`tools/iostouch/qt/usbmuxd_server.py` 中的对应实现来自该项目；这些文件不是
+`iUsbBridge` 上游组件的一部分。其公开仓库截至本说明更新时未提供根目录 `LICENSE` 或可供本项目
+采用的完整第三方许可声明，本项目暂时使用该实现，将在后续开发完毕自研驱动后完全弃用。
+
+关于实现来源，本项目作者明确保留以下主张：iPhoneUsbTouch 的部分或全部 USBMux、
+有线投屏和有线反控方案，在未经许可的情况下对作者当时尚未公开的[RayrenSX/iUsbBridge](https://github.com/RayrenSX/iUsbBridge) 方案借用当时已发布架构图复现或部分逆向或完全逆向,
+希望该作者xiaozai-van-liu在本作者已公开[RayrenSX/iUsbBridge](https://github.com/RayrenSX/iUsbBridge)的前提下将iUsbBridge 非商业使用许可补充至其项目licence。
+
+当前 iPhoneMirror 使用的 USBMux 反向控制桥接器来自上游本人项目
+[RayrenSX/iUsbBridge](https://github.com/RayrenSX/iUsbBridge)。桥接器作为独立组件构建和发布，
+其源码、二进制、非商业使用限制、署名要求以及第三方依赖均以该上游仓库及其许可证文件为准；
+商业用途需要另行取得上游作者许可。
 
 ## OBS
 

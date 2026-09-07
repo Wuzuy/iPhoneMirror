@@ -89,8 +89,9 @@ public partial class CaptureStatusNoticeWindow : Wpf.Ui.Controls.FluentWindow
     internal static void ShowDeveloperReverseControlErrorPreview(Window owner) =>
         ShowDeveloperPreview(owner,
             LocalizationService.Get("ReverseControlErrorTitle"),
-            LocalizationService.Format("ReverseControlErrorBodyFormat", "USB",
-                "开发者服务未就绪（开发者工具预览）"), NoticeKind.Error,
+            LocalizationService.Format("ReverseControlErrorBodyFormat",
+                LocalizationService.Get("ReverseControlTransportWired"),
+                LocalizationService.Get("DeveloperPreviewReverseControlUnavailable")), NoticeKind.Error,
             reverseControl: true);
 
     internal static void ShowDeveloperStoppedPreview(Window owner) =>

@@ -2,6 +2,7 @@
 param(
     [ValidatePattern('^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$')]
     [string]$Version,
+    [switch]$AllowVersionOverride,
     [switch]$SkipBuild,
     [switch]$GenerateSbom,
     [switch]$UpdateReleaseManifest,
@@ -44,6 +45,10 @@ function Get-ProjectVersion([string]$ProjectPath) {
 $AppProjectPath = Join-Path $Root 'src\App\iPhoneMirror.App.csproj'
 if ([string]::IsNullOrWhiteSpace($Version)) {
     $Version = Get-ProjectVersion $AppProjectPath
+}
+if ($AllowVersionOverride -and
+    [string]::IsNullOrWhiteSpace($PSBoundParameters['Version'])) {
+    throw '-AllowVersionOverride requires an explicit -Version.'
 }
 if ($Version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') {
     throw "Invalid package version in ${AppProjectPath}: $Version"
@@ -525,14 +530,18 @@ try {
         'src\DriverInstaller\iPhoneMirror.DriverInstaller.csproj'
     )) {
         $projectVersion = Get-ProjectVersion (Join-Path $Root $project)
-        if (-not [string]::Equals($projectVersion, $Version,
+        if (-not $AllowVersionOverride -and
+            -not [string]::Equals($projectVersion, $Version,
                 [StringComparison]::Ordinal)) {
             throw "Package version $Version does not match $project version $projectVersion."
         }
     }
 
     if (-not $SkipBuild) {
-        $buildArguments = @{ Configuration = 'Release' }
+        $buildArguments = @{
+            Configuration = 'Release'
+            Version = $Version
+        }
     if ($OmitMediaOutputRuntime) {
             $buildArguments.OmitMediaOutputRuntime = $true
         }
@@ -597,6 +606,7 @@ try {
     Assert-SafeWorkspaceDirectory $StagingRoot
     New-Item -ItemType Directory -Force -Path $StagingRoot | Out-Null
     & (Join-Path $Root 'scripts\build_installer.ps1') -Version $Version `
+        -AllowVersionOverride `
         -SkipAppBuild -SourceDirectory $InstallerPublishRoot `
         -OutputDirectory $StagingRoot
     if ($LASTEXITCODE -ne 0 -or

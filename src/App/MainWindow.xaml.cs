@@ -497,6 +497,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
             var snapshot = app.UpdateSettings.Clone();
             app.UpdateSettings.BluetoothModeShortcutVirtualKey = (int)shortcuts[BluetoothShortcutAction.BluetoothControl].VirtualKey;
             app.UpdateSettings.BluetoothModeShortcutModifiers = (int)shortcuts[BluetoothShortcutAction.BluetoothControl].Modifiers;
+            app.UpdateSettings.BluetoothModeShortcutSchema = 1;
             app.UpdateSettings.WirelessModeShortcutVirtualKey = (int)shortcuts[BluetoothShortcutAction.WirelessControl].VirtualKey;
             app.UpdateSettings.WirelessModeShortcutModifiers = (int)shortcuts[BluetoothShortcutAction.WirelessControl].Modifiers;
             app.UpdateSettings.WiredModeShortcutVirtualKey = (int)shortcuts[BluetoothShortcutAction.WiredControl].VirtualKey;
@@ -1021,7 +1022,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         }
         catch (Exception error)
         {
-            _viewModel.AddUiLog($"USB 控制操作失败：{error.Message}");
+            _viewModel.AddUiLog(LocalizationService.Format("UsbControlOperationFailedFormat", error.Message));
             _viewModel.AddDiagnosticLog(AppLog.Event(
                 "independent_usb_control_request_failed",
                 ("device", AppLog.Device(udid)), ("error", AppLog.Error(error))));
@@ -1041,7 +1042,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         }
         catch (Exception error)
         {
-            _viewModel.AddUiLog($"无线反控操作失败：{error.Message}");
+            _viewModel.AddUiLog(LocalizationService.Format("WirelessControlOperationFailedFormat", error.Message));
             _viewModel.AddDiagnosticLog(AppLog.Event(
                 "independent_wireless_control_request_failed",
                 ("device", AppLog.Device(udid)), ("error", AppLog.Error(error))));
@@ -1611,7 +1612,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         {
             _reverseControlWindow = null;
             DiagnosticLogger.Exception("ui", "device_binding_window_open_failed", error);
-            AppPromptWindow.Inform("设备绑定器", $"无法打开设备绑定器：{error.Message}");
+            AppPromptWindow.Inform(LocalizationService.Get("DeviceBindingTitle"), LocalizationService.Format("DeviceBindingOpenFailedFormat", error.Message));
         }
     }
 
@@ -4963,7 +4964,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         }
         catch (Exception error)
         {
-            _viewModel.AddUiLog($"蓝牙反控启动失败：{error.Message}");
+            _viewModel.AddUiLog(LocalizationService.Format("BluetoothControlStartFailedFormat", error.Message));
             _viewModel.AddDiagnosticLog(AppLog.Event("bluetooth_control_toolbar_failed",
                 ("error", AppLog.Error(error))));
         }
@@ -4980,9 +4981,10 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         }
         catch (Exception error)
         {
-            _viewModel.AddUiLog($"USB 控制操作失败：{error.Message}");
-            System.Windows.MessageBox.Show(this, $"USB 控制操作失败：{error.Message}",
-                "USB 控制", MessageBoxButton.OK, MessageBoxImage.Warning);
+            var message = LocalizationService.Format("UsbControlOperationFailedFormat", error.Message);
+            _viewModel.AddUiLog(message);
+            System.Windows.MessageBox.Show(this, message,
+                LocalizationService.Get("UsbControlTitle"), MessageBoxButton.OK, MessageBoxImage.Warning);
             _viewModel.AddDiagnosticLog(AppLog.Event("usb_control_toolbar_failed",
                 ("error", AppLog.Error(error))));
         }
@@ -4998,7 +5000,7 @@ public partial class MainWindow : Wpf.Ui.Controls.FluentWindow
         }
         catch (Exception error)
         {
-            _viewModel.AddUiLog($"无线反控操作失败：{error.Message}");
+            _viewModel.AddUiLog(LocalizationService.Format("WirelessControlOperationFailedFormat", error.Message));
             _viewModel.AddDiagnosticLog(AppLog.Event("wireless_control_toolbar_failed",
                 ("error", AppLog.Error(error))));
         }

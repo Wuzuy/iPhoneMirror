@@ -1,5 +1,5 @@
 set(IPHONEMIRROR_CORE_SOURCES
-    resources/iPhoneMirror.Core.rc
+    "${CMAKE_BINARY_DIR}/src/Core/iPhoneMirror.Core.rc"
     src/CoreApi.cpp
     src/Logging.cpp
     src/Protocol/Plist.cpp
