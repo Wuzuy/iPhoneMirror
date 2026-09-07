@@ -942,7 +942,7 @@ foreach (var iconSourcePath in iconSourceDirectories.SelectMany(directory =>
             StringComparison.OrdinalIgnoreCase)) ||
         iconSourceText.Contains(fontIconElementName, StringComparison.Ordinal) ||
         System.Text.RegularExpressions.Regex.IsMatch(iconSourceText,
-            @"&#x[EeFf][0-9A-Fa-f]{3};|\\[ux][EeFf][0-9A-Fa-f]{3}|[\uE000-\uF8FF]"),
+            @"&#x(?:[Ee][0-9A-Fa-f]{3}|[Ff][0-8][0-9A-Fa-f]{2});|\\[ux](?:[Ee][0-9A-Fa-f]{3}|[Ff][0-8][0-9A-Fa-f]{2})|[\uE000-\uF8FF]"),
         $"{Path.GetRelativePath(sourceDirectory, iconSourcePath)} uses packaged semantic icons");
 }
 
@@ -2506,6 +2506,9 @@ try
         BluetoothControlShortcutVirtualKey = KeyInterop.VirtualKeyFromKey(Key.F8),
         BluetoothControlShortcutModifiers = 0x0002,
         BluetoothControlShortcutSchema = 1,
+        BluetoothModeShortcutVirtualKey = 0,
+        BluetoothModeShortcutModifiers = 0,
+        BluetoothModeShortcutSchema = 0,
         BluetoothBossShortcutVirtualKey = KeyInterop.VirtualKeyFromKey(Key.P),
         BluetoothBossShortcutModifiers = 0x0006,
         BluetoothBackShortcutVirtualKey = KeyInterop.VirtualKeyFromKey(Key.F7),
@@ -2555,6 +2558,13 @@ try
         "update settings preserve Bluetooth control shortcut key");
     Equal(0x0002, loadedSettings.BluetoothControlShortcutModifiers,
         "update settings preserve Bluetooth control shortcut modifiers");
+    Equal(KeyInterop.VirtualKeyFromKey(Key.F9),
+        loadedSettings.BluetoothModeShortcutVirtualKey,
+        "legacy Bluetooth mode shortcut zero value migrates to F9");
+    Equal(0, loadedSettings.BluetoothModeShortcutModifiers,
+        "legacy Bluetooth mode shortcut keeps no modifiers");
+    Equal(1, loadedSettings.BluetoothModeShortcutSchema,
+        "Bluetooth mode shortcut migration records its schema");
     Equal(KeyInterop.VirtualKeyFromKey(Key.P), loadedSettings.BluetoothBossShortcutVirtualKey,
         "update settings preserve boss key shortcut key");
     Equal(0x0006, loadedSettings.BluetoothBossShortcutModifiers,
@@ -2600,6 +2610,19 @@ Equal("BluetoothLE#TEST-CLIENT",
         ?? throw new InvalidOperationException("stale schema migration was not persisted");
     Equal(0, staleSchemaSixPersisted.BluetoothBackShortcutVirtualKey,
         "schema 6 stale Back shortcut key cleanup is persisted");
+    var explicitUnboundModeStore = new UpdateSettingsStore(
+        Path.Combine(updateSettingsRoot, "explicit-unbound-mode.json"));
+    explicitUnboundModeStore.Save(new UpdateSettings
+    {
+        BluetoothModeShortcutVirtualKey = 0,
+        BluetoothModeShortcutModifiers = 0,
+        BluetoothModeShortcutSchema = 1,
+    });
+    var explicitUnboundMode = explicitUnboundModeStore.Load();
+    Equal(0, explicitUnboundMode.BluetoothModeShortcutVirtualKey,
+        "schema 1 preserves an explicitly unbound Bluetooth mode shortcut");
+    Equal(1, explicitUnboundMode.BluetoothModeShortcutSchema,
+        "schema 1 preserves the Bluetooth mode shortcut schema");
     settingsStore.Update(settings => settings.Language = "en-US");
     var languageUpdatedSettings = settingsStore.Load();
     Equal(true, languageUpdatedSettings.AutoDownload,
@@ -2644,6 +2667,38 @@ try
         "Bluetooth control shortcut defaults to F9");
     Equal(0, defaults.BluetoothControlShortcutModifiers,
         "Bluetooth control shortcut defaults without modifiers");
+    Equal(KeyInterop.VirtualKeyFromKey(Key.F9),
+        defaults.BluetoothModeShortcutVirtualKey,
+        "Bluetooth control mode shortcut defaults to F9");
+    Equal(0, defaults.BluetoothModeShortcutModifiers,
+        "Bluetooth control mode shortcut defaults without modifiers");
+    Equal(true, KeyboardShortcut.FromSettings(defaults,
+        BluetoothShortcutAction.BluetoothControl).Equals(
+            KeyboardShortcut.Default),
+        "Bluetooth control mode shortcut resolves to the F9 default");
+    Equal(true, KeyboardShortcut.DefaultFor(BluetoothShortcutAction.BluetoothControl)
+        .Equals(KeyboardShortcut.Default),
+        "Bluetooth control shortcut reset value is F9");
+    Equal((int)KeyboardShortcut.MouseMiddle,
+        defaults.BluetoothAppSwitcherShortcutVirtualKey,
+        "Bluetooth app switcher shortcut defaults to the middle mouse button");
+    Equal((int)KeyboardShortcut.MouseRight,
+        defaults.BluetoothHomeShortcutVirtualKey,
+        "Bluetooth home shortcut defaults to the right mouse button");
+    Equal(true, KeyboardShortcut.FromSettings(defaults,
+        BluetoothShortcutAction.AppSwitcher).Equals(
+            KeyboardShortcut.AppSwitcherDefault),
+        "Bluetooth app switcher shortcut resolves to the middle mouse button default");
+    Equal(true, KeyboardShortcut.FromSettings(defaults,
+        BluetoothShortcutAction.Home).Equals(
+            KeyboardShortcut.HomeDefault),
+        "Bluetooth home shortcut resolves to the right mouse button default");
+    Equal(true, KeyboardShortcut.DefaultFor(BluetoothShortcutAction.AppSwitcher)
+        .Equals(KeyboardShortcut.AppSwitcherDefault),
+        "Bluetooth app switcher shortcut reset value is the middle mouse button");
+    Equal(true, KeyboardShortcut.DefaultFor(BluetoothShortcutAction.Home)
+        .Equals(KeyboardShortcut.HomeDefault),
+        "Bluetooth home shortcut reset value is the right mouse button");
     Equal(true, KeyboardShortcut.FromSettings(defaults,
         BluetoothShortcutAction.BossKey).Equals(KeyboardShortcut.BossKeyDefault),
         "boss key defaults to Ctrl+Alt+B");
@@ -3611,13 +3666,15 @@ Equal(true,
         StringComparer.OrdinalIgnoreCase) &&
     uxPlayRequiredRuntimeFiles.Contains("lib\\gstreamer-1.0\\libgstlibav.dll",
         StringComparer.OrdinalIgnoreCase) &&
+    uxPlayRequiredRuntimeFiles.Contains("lib\\gstreamer-1.0\\libgstplayback.dll",
+        StringComparer.OrdinalIgnoreCase) &&
+    uxPlayRequiredRuntimeFiles.Contains("lib\\gstreamer-1.0\\libgstautodetect.dll",
+        StringComparer.OrdinalIgnoreCase) &&
     !uxPlayRequiredRuntimeFiles.Contains("lib\\gstreamer-1.0\\libgstlevel.dll",
         StringComparer.OrdinalIgnoreCase) &&
     uxPlayRequiredRuntimeFiles.Contains("lib\\gstreamer-1.0\\libgsty4m.dll",
-        StringComparer.OrdinalIgnoreCase) &&
-    !uxPlayRequiredRuntimeFiles.Contains("lib\\gstreamer-1.0\\libgstplayback.dll",
         StringComparer.OrdinalIgnoreCase),
-    "UxPlay packaging omits unused GStreamer plugins");
+    "UxPlay packaging includes its startup-required GStreamer plugins and omits unused plugins");
 var uxPlayPreparationSource = File.ReadAllText(Path.Combine(sourceDirectory,
     "..", "scripts", "prepare_uxplay.ps1"));
 Equal(true,
@@ -3659,6 +3716,8 @@ Equal(true,
         StringComparison.Ordinal) &&
     uxPlayHostSource.Contains("automatic-request-sync-points=true",
         StringComparison.Ordinal) &&
+    uxPlayHostSource.Contains("libgstplayback.dll", StringComparison.Ordinal) &&
+    uxPlayHostSource.Contains("libgstautodetect.dll", StringComparison.Ordinal) &&
     uxPlayHostSource.Contains("libgsty4m.dll", StringComparison.Ordinal) &&
     uxPlayHostSource.Contains("LoadLibraryExW", StringComparison.Ordinal) &&
     uxPlayHostSource.Contains("LOAD_WITH_ALTERED_SEARCH_PATH", StringComparison.Ordinal) &&
@@ -4915,6 +4974,13 @@ Equal(WirelessStallRecoveryAction.None,
     stallTracker.Observe(77, StreamingStatus(videoFrames: 101), 1_010,
         stallStart.AddSeconds(1)),
     "advancing wireless frames do not trigger recovery");
+var telemetryOnlyChange = StreamingStatus(videoFrames: 101);
+telemetryOnlyChange.Fps = 1;
+telemetryOnlyChange.LatencyMs = 900;
+Equal(WirelessStallRecoveryAction.None,
+    stallTracker.Observe(77, telemetryOnlyChange, 1_010,
+        stallStart.AddSeconds(1.5)),
+    "telemetry-only changes do not mask a frozen wireless video stream");
 Equal(WirelessStallRecoveryAction.RefreshPreview,
     stallTracker.Observe(77, StreamingStatus(videoFrames: 101), 1_010,
         stallStart.AddMilliseconds(2900)),
@@ -4932,16 +4998,24 @@ Equal(WirelessStallRecoveryAction.None,
         stallStart.AddSeconds(20)),
     "wireless recovery is capped after the restart attempt");
 Equal(WirelessStallRecoveryAction.None,
-    stallTracker.Observe(77, StreamingStatus(1080, 1920, 101),
-        1_010, stallStart.AddSeconds(21)),
+    stallTracker.Observe(78, StreamingStatus(videoFrames: 1), 2_000,
+        stallStart.AddSeconds(20.5)),
+    "a replacement wireless session starts a fresh recovery window");
+Equal(WirelessStallRecoveryAction.RefreshPreview,
+    stallTracker.Observe(78, StreamingStatus(videoFrames: 1), 2_000,
+        stallStart.AddSeconds(23)),
+    "a frozen replacement session can request recovery independently");
+Equal(WirelessStallRecoveryAction.None,
+    stallTracker.Observe(78, StreamingStatus(1080, 1920, 1),
+        2_000, stallStart.AddSeconds(24)),
     "orientation size changes begin a fresh recovery window");
 Equal(WirelessStallRecoveryAction.RefreshPreview,
-    stallTracker.Observe(77, StreamingStatus(1080, 1920, 101),
-        1_010, stallStart.AddSeconds(23)),
+    stallTracker.Observe(78, StreamingStatus(1080, 1920, 1),
+        2_000, stallStart.AddSeconds(26)),
     "a second frozen orientation can request one new refresh");
 Equal(WirelessStallRecoveryAction.None,
     stallTracker.Observe(77, StreamingStatus(state: CaptureState.Idle),
-        1_010, stallStart.AddSeconds(24)),
+        1_010, stallStart.AddSeconds(27)),
     "stopped wireless sessions never trigger recovery");
 
 Console.WriteLine("App logic tests passed.");

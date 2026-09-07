@@ -56,6 +56,7 @@ from pymobiledevice3.exceptions import (
     ConnectionTerminatedError,
     DeveloperModeIsNotEnabledError,
     DeviceNotFoundError,
+    GetProhibitedError,
     MissingValueError,
     MuxException,
     NotMountedError,
@@ -1438,6 +1439,16 @@ class TouchSession:
         await self._emit_status('checking_developer_environment')
         try:
             developer_mode_enabled = await lockdown.get_developer_mode_status()
+        except (GetProhibitedError, NotPairedError) as error:
+            # Lockdown reports GetProhibited when the host has not completed
+            # the device trust handshake. Do not mislabel that as Developer
+            # Mode being disabled; the WPF host already has a precise trust
+            # recovery message for this stable error code.
+            raise BridgePrerequisiteError(
+                'apple_device_not_trusted',
+                'The iPhone has not trusted this Windows host. Unlock the device '
+                'and tap Trust, then reconnect the USB cable.',
+            ) from error
         except Exception as error:
             raise BridgePrerequisiteError(
                 'developer_mode_check_failed',

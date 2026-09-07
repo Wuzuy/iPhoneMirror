@@ -44,6 +44,9 @@ internal static class LocalizationService
         return key;
     }
 
+    internal static string GetOrDefault(string key, string fallback) =>
+        Application.Current?.TryFindResource(key) is string value ? value : fallback;
+
     internal static string Format(string key, params object?[] arguments) =>
         string.Format(_effectiveCulture, Get(key), arguments);
 

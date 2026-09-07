@@ -439,6 +439,19 @@ class TestDeveloperEnvironmentPreflight(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(raised.exception.code, 'developer_mode_check_failed')
 
+    async def test_developer_mode_query_rejected_without_trust_has_trust_error(self):
+        import usb_touch_bridge as bridge
+
+        class Lockdown:
+            async def get_developer_mode_status(self):
+                raise bridge.GetProhibitedError('GetProhibited', None, '')
+
+        session = bridge.TouchSession(self.Ipc(), 120)
+        with self.assertRaises(bridge.BridgePrerequisiteError) as raised:
+            await session._preflight_developer_environment(Lockdown())
+
+        self.assertEqual(raised.exception.code, 'apple_device_not_trusted')
+
     async def test_explicit_local_ddi_is_mounted_and_rechecked(self):
         import usb_touch_bridge as bridge
 

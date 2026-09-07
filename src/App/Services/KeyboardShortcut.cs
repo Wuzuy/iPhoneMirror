@@ -18,6 +18,8 @@ internal readonly record struct KeyboardShortcut(uint Modifiers, uint VirtualKey
     internal const uint MouseRight = 0x100;
     internal const uint MouseMiddle = 0x101;
     internal static KeyboardShortcut Default { get; } = new(0, 0x78); // F9
+    internal static KeyboardShortcut AppSwitcherDefault { get; } = new(0, MouseMiddle);
+    internal static KeyboardShortcut HomeDefault { get; } = new(0, MouseRight);
     internal static KeyboardShortcut BossKeyDefault { get; } = new(Control | Alt, 0x42); // Ctrl+Alt+B
     internal static KeyboardShortcut Unbound { get; } = new(0, 0);
     internal bool IsBound => VirtualKey != 0;
@@ -38,7 +40,7 @@ internal readonly record struct KeyboardShortcut(uint Modifiers, uint VirtualKey
             // Bluetooth control shortcut. Keep the enum value for old data,
             // but never expose or register its stored key again.
             BluetoothShortcutAction.ReverseControl => Unbound,
-            BluetoothShortcutAction.BluetoothControl => FromStoredSettings(settings.BluetoothModeShortcutModifiers, settings.BluetoothModeShortcutVirtualKey, Unbound),
+            BluetoothShortcutAction.BluetoothControl => FromStoredSettings(settings.BluetoothModeShortcutModifiers, settings.BluetoothModeShortcutVirtualKey, Default),
             BluetoothShortcutAction.WirelessControl => FromStoredSettings(settings.WirelessModeShortcutModifiers, settings.WirelessModeShortcutVirtualKey, Unbound),
             BluetoothShortcutAction.WiredControl => FromStoredSettings(settings.WiredModeShortcutModifiers, settings.WiredModeShortcutVirtualKey, Unbound),
             BluetoothShortcutAction.ControlCenter => FromStoredSettings(
@@ -49,10 +51,12 @@ internal readonly record struct KeyboardShortcut(uint Modifiers, uint VirtualKey
                 settings.BluetoothNotificationCenterShortcutVirtualKey, Unbound),
             BluetoothShortcutAction.AppSwitcher => FromStoredSettings(
                 settings.BluetoothAppSwitcherShortcutModifiers,
-                settings.BluetoothAppSwitcherShortcutVirtualKey, Unbound),
+                settings.BluetoothAppSwitcherShortcutVirtualKey,
+                AppSwitcherDefault),
             BluetoothShortcutAction.Home => FromStoredSettings(
                 settings.BluetoothHomeShortcutModifiers,
-                settings.BluetoothHomeShortcutVirtualKey, Unbound),
+                settings.BluetoothHomeShortcutVirtualKey,
+                HomeDefault),
             BluetoothShortcutAction.BossKey => FromStoredSettings(
                 settings.BluetoothBossShortcutModifiers,
                 settings.BluetoothBossShortcutVirtualKey, BossKeyDefault),
@@ -143,6 +147,9 @@ internal readonly record struct KeyboardShortcut(uint Modifiers, uint VirtualKey
     internal static KeyboardShortcut DefaultFor(BluetoothShortcutAction action) => action switch
     {
         BluetoothShortcutAction.ReverseControl => Unbound,
+        BluetoothShortcutAction.BluetoothControl => Default,
+        BluetoothShortcutAction.AppSwitcher => AppSwitcherDefault,
+        BluetoothShortcutAction.Home => HomeDefault,
         BluetoothShortcutAction.BossKey => BossKeyDefault,
         _ => Unbound,
     };

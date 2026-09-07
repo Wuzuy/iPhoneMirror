@@ -808,9 +808,9 @@
                     </ui:NavigationViewItem.Icon>
                 </ui:NavigationViewItem>
                 <ui:NavigationViewItem Style="{StaticResource ShellNavigationItem}"
-                                       Content="设备绑定器"
+                                       Content="{DynamicResource NavDeviceBinding}"
                                        Click="OnNavigateReverseControlClick"
-                                       ToolTip="管理真实设备的 USB、AirPlay 和 Bluetooth 身份绑定"
+                                       ToolTip="{DynamicResource NavDeviceBindingDescription}"
                                        AutomationProperties.AutomationId="DeviceBindingNavButton">
                     <ui:NavigationViewItem.Icon>
                         <ui:SymbolIcon Symbol="UsbPlug24" FontSize="20"/>
@@ -1203,7 +1203,7 @@
                                     AutomationProperties.AutomationId="WirelessControlButton">
                                 <StackPanel Orientation="Horizontal">
                                     <ui:SymbolIcon Style="{StaticResource ButtonSymbolIcon}" Symbol="Wifi120" FontSize="15"/>
-                                    <TextBlock Text="无线控制" Margin="6,0,0,0"/>
+                                    <TextBlock Text="{DynamicResource WirelessControlLabel}" Margin="6,0,0,0"/>
                                 </StackPanel>
                             </Button>
                             <Button Click="OnStartUsbControlClick"
@@ -1213,7 +1213,7 @@
                                     AutomationProperties.AutomationId="UsbControlButton">
                                 <StackPanel Orientation="Horizontal">
                                     <ui:SymbolIcon Style="{StaticResource ButtonSymbolIcon}" Symbol="UsbPlug24" FontSize="15"/>
-                                    <TextBlock Text="有线控制" Margin="6,0,0,0"/>
+                                    <TextBlock Text="{DynamicResource WiredControlLabel}" Margin="6,0,0,0"/>
                                 </StackPanel>
                             </Button>
                             <Button Click="OnStartBluetoothControlClick"
@@ -1223,7 +1223,7 @@
                                     AutomationProperties.AutomationId="BluetoothControlButton">
                                 <StackPanel Orientation="Horizontal">
                                     <ui:SymbolIcon Style="{StaticResource ButtonSymbolIcon}" Symbol="Cursor20" FontSize="15"/>
-                                    <TextBlock Text="蓝牙控制" Margin="6,0,0,0"/>
+                                    <TextBlock Text="{DynamicResource BluetoothControlLabel}" Margin="6,0,0,0"/>
                                 </StackPanel>
                             </Button>
                             <Button x:Name="QuickMediaOutputButton"

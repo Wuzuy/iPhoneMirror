@@ -338,19 +338,22 @@ void WirelessClientStream::attach(CapturePreferences preferences) {
 
 void WirelessClientStream::reset_video_for_attach() noexcept {
     std::scoped_lock lock(mutex_);
-    // A capture restart reuses the discovered AirPlay stream object. Drop all
-    // frames and counters from the previous capture so the renderer and stall
-    // detector cannot mistake an old portrait frame for the new session's
-    // first frame after an orientation change.
-    latest_frame_.reset();
-    render_queue_.clear();
-    snapshot_.width = snapshot_.height = 0;
-    snapshot_.fps = snapshot_.latency_ms = 0;
-    snapshot_.video_frames = snapshot_.audio_packets = 0;
-    snapshot_.audio_sample_rate = snapshot_.audio_channels = 0;
+    // A local capture-session recovery must not blank an otherwise live
+    // AirPlay connection. Keep the last decoded frame visible while the
+    // subscriber is re-attached; the next frame will replace it and the
+    // format-change path below will clear it only when geometry really changes.
+    // This is deliberately different from a new device connection, where no
+    // frame exists yet and the counters should start from zero.
+    if (!latest_frame_) {
+        render_queue_.clear();
+        snapshot_.width = snapshot_.height = 0;
+        snapshot_.fps = snapshot_.latency_ms = 0;
+        snapshot_.video_frames = snapshot_.audio_packets = 0;
+        snapshot_.audio_sample_rate = snapshot_.audio_channels = 0;
+    }
     started_at_ = std::chrono::steady_clock::now();
     fps_sample_time_ = started_at_;
-    fps_sample_frames_ = 0;
+    fps_sample_frames_ = snapshot_.video_frames;
 }
 
 void WirelessClientStream::detach() noexcept {

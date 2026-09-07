@@ -1278,11 +1278,11 @@ internal static class Program
         TestDeveloperPreviewAction(application, owner, openSurface,
             "prompt", "AppPromptWindow", "OnCancelClick");
         TestDeveloperPreviewAction(application, owner, openSurface,
-            "reverse-control-wired-prerequisite", "AppPromptWindow", "OnCancelClick");
+            "reverse-control-wired-prerequisite", "BluetoothControlNoticeWindow", "OnCloseClick");
         TestDeveloperPreviewAction(application, owner, openSurface,
-            "reverse-control-wireless-prerequisite", "AppPromptWindow", "OnCancelClick");
+            "reverse-control-wireless-prerequisite", "BluetoothControlNoticeWindow", "OnCloseClick");
         TestDeveloperPreviewAction(application, owner, openSurface,
-            "reverse-control-error", "AppPromptWindow", "OnConfirmClick");
+            "reverse-control-error", "CaptureStatusNoticeWindow", "OnCloseClick");
         TestDeveloperPreviewAction(application, owner, openSurface,
             "capture-error", "CaptureStatusNoticeWindow", "OnCloseClick");
         TestDeveloperPreviewAction(application, owner, openSurface,

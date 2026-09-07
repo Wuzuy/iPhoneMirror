@@ -102,9 +102,9 @@ internal sealed class NativePreviewWindow : IDisposable
 
     private readonly HwndSource _source;
     private readonly AspectRatioWindowController _aspectController;
-    private readonly Func<nint, bool> _attachPreview;
-    private readonly Action<nint> _detachPreview;
-    private readonly Func<nint, bool> _refreshPreview;
+    private Func<nint, bool> _attachPreview;
+    private Action<nint> _detachPreview;
+    private Func<nint, bool> _refreshPreview;
     private readonly ContextMenu _contextMenu;
     private readonly MenuItem _fullScreenItem;
     private readonly MenuItem _windowMenuItem;
@@ -139,7 +139,7 @@ internal sealed class NativePreviewWindow : IDisposable
     private readonly Action<nint>? _requestUsbControl;
     private readonly Action<nint>? _requestWirelessControl;
     private readonly Action<string>? _logDiagnostic;
-    private readonly ulong _sessionHandle;
+    private ulong _sessionHandle;
     private readonly double _cornerRadius;
     private readonly double _cornerExponent;
     private readonly Border? _managedContentRoot;
@@ -374,6 +374,43 @@ internal sealed class NativePreviewWindow : IDisposable
         (_rotation & 1) == 0
             ? (_sourceWidth, _sourceHeight, _rotation)
             : (_sourceHeight, _sourceWidth, _rotation);
+
+    internal bool RebindSession(ulong sessionHandle)
+    {
+        if (_disposed || _managedContent is not null || _handle == 0 || sessionHandle == 0)
+            return false;
+
+        var previousHandle = _sessionHandle;
+        if (_attached)
+        {
+            try { _detachPreview(_handle); }
+            catch { /* The old native session may already be gone. */ }
+            _attached = false;
+        }
+
+        _sessionHandle = sessionHandle;
+        _attachPreview = hwnd => NativeCore.AttachDevicePreview(sessionHandle, hwnd);
+        _detachPreview = hwnd => NativeCore.DetachDevicePreview(sessionHandle, hwnd);
+        _refreshPreview = hwnd => NativeCore.AttachDevicePreview(sessionHandle, hwnd);
+        if (!_attachPreview(_handle))
+        {
+            Log("independent_window_rebind_failed",
+                ("mode", WindowMode), ("old_handle", AppLog.Handle(previousHandle)),
+                ("new_handle", AppLog.Handle(sessionHandle)));
+            return false;
+        }
+
+        _attached = true;
+        _ = NativeCore.SetDeviceWindowCornerProfile(sessionHandle, _handle,
+            _cornersEnabled ? _cornerRadius : 0, _cornerExponent);
+        if (_rotation != 0)
+            _ = NativeCore.SetDeviceWindowRotation(sessionHandle, _handle, _rotation);
+        Log("independent_window_rebound",
+            ("mode", WindowMode), ("old_handle", AppLog.Handle(previousHandle)),
+            ("new_handle", AppLog.Handle(sessionHandle)));
+        return true;
+    }
+
     private string WindowMode => _managedContent is null ? "device" : "media_cast";
 
     private void Log(string eventName, params (string Key, object? Value)[] fields)
