@@ -679,6 +679,36 @@ class TestDeveloperEnvironmentPreflight(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(bridge.BridgePrerequisiteError):
                 await session._connect_with_lockdown(Lockdown())
 
+    async def test_missing_coredevice_proxy_falls_back_to_remote_pairing(self):
+        import usb_touch_bridge as bridge
+
+        class Lockdown:
+            udid = 'trusted-device'
+
+        ipc = self.Ipc()
+        session = bridge.TouchSession(ipc, 120, udid='trusted-device')
+        calls = []
+
+        async def preflight(_lockdown):
+            calls.append('preflight')
+
+        async def create_tunnel(_lockdown):
+            calls.append('coredevice')
+            raise bridge.InvalidServiceError(
+                'InvalidService', 'trusted-device', '17.3')
+
+        async def connect_remote_pairing():
+            calls.append('remote_pairing')
+
+        with patch.object(session, '_preflight_developer_environment', preflight), \
+             patch.object(bridge.CoreDeviceTunnelProxy, 'create', create_tunnel), \
+             patch.object(session, '_connect_via_remote_pairing', connect_remote_pairing):
+            await session._connect_with_lockdown(Lockdown())
+
+        self.assertEqual(calls, ['preflight', 'coredevice', 'remote_pairing'])
+        self.assertIn('coredevice_proxy_unavailable',
+                      [event['code'] for event in ipc.events])
+
     async def test_ready_is_rejected_when_authentication_gate_is_closed(self):
         import usb_touch_bridge as bridge
 
@@ -857,7 +887,7 @@ class TestOptionalDisplayService(unittest.IsolatedAsyncioTestCase):
             remote_attempts.append(True)
 
         with patch.object(session, '_create_lockdown_with_retry', no_network_lockdown), \
-             patch.object(session, '_connect_wireless_via_remote_pairing', connect_remote_pairing):
+             patch.object(session, '_connect_via_remote_pairing', connect_remote_pairing):
             await session.connect()
 
         self.assertEqual(remote_attempts, [True])
@@ -872,7 +902,7 @@ class TestOptionalDisplayService(unittest.IsolatedAsyncioTestCase):
         session = bridge.TouchSession(Ipc(), 120, udid='trusted-device', transport='wireless')
         with patch.object(bridge, 'iter_remote_paired_identifiers', return_value=iter(())):
             with self.assertRaises(bridge.BridgePrerequisiteError) as raised:
-                await session._connect_wireless_via_remote_pairing()
+                await session._connect_via_remote_pairing()
 
         self.assertEqual(raised.exception.code, 'wireless_remote_pairing_required')
 
@@ -899,7 +929,7 @@ class TestOptionalDisplayService(unittest.IsolatedAsyncioTestCase):
                           return_value=iter(('00008150-abcdef',))), \
              patch.object(bridge, 'get_remote_pairing_tunnel_services', discover):
             with self.assertRaises(bridge.BridgePrerequisiteError) as raised:
-                await session._connect_wireless_via_remote_pairing()
+                await session._connect_via_remote_pairing()
 
         self.assertEqual(raised.exception.code, 'wireless_device_not_discoverable')
         self.assertEqual(captured['udid'], '00008150-abcdef')
