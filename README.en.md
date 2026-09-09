@@ -9,7 +9,7 @@
   Direct USB capture and wireless AirPlay reception in one application.
 </p>
 
-<p align="center"><a href="README.md">简体中文</a> · <strong>English</strong></p>
+<p align="center"><a href="README.md">简体中文</a> · <strong>English</strong> · <a href="README.pt-BR.md">Português (Brasil)</a></p>
 
 <p align="center">
   <a href="https://github.com/RayrenSX/iPhoneMirror/releases"><img alt="GitHub Release" src="https://img.shields.io/github/v/release/RayrenSX/iPhoneMirror?include_prereleases&sort=semver"></a>
