@@ -906,6 +906,7 @@
     <system:String x:Key="DeveloperLanguageSimplified">簡體中文</system:String>
     <system:String x:Key="DeveloperLanguageTraditional">繁體中文（香港）</system:String>
     <system:String x:Key="DeveloperLanguageEnglish">English</system:String>
+    <system:String x:Key="DeveloperLanguagePortuguese">葡萄牙語（巴西）</system:String>
     <system:String x:Key="DeveloperPresetCompact">緊湊 1280×700</system:String>
     <system:String x:Key="DeveloperPresetDefault">預設 1540×900</system:String>
     <system:String x:Key="DeveloperPresetMaximize">最大化</system:String>

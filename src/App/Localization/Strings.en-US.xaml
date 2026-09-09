@@ -906,6 +906,7 @@ Make sure the phone and computer are on the same local network and keep the devi
     <system:String x:Key="DeveloperLanguageSimplified">Simplified Chinese</system:String>
     <system:String x:Key="DeveloperLanguageTraditional">Traditional Chinese (Hong Kong)</system:String>
     <system:String x:Key="DeveloperLanguageEnglish">English</system:String>
+    <system:String x:Key="DeveloperLanguagePortuguese">Portuguese (Brazil)</system:String>
     <system:String x:Key="DeveloperPresetCompact">Compact 1280×700</system:String>
     <system:String x:Key="DeveloperPresetDefault">Default 1540×900</system:String>
     <system:String x:Key="DeveloperPresetMaximize">Maximize</system:String>

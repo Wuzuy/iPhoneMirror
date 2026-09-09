@@ -12,6 +12,7 @@ internal static class LocalizationService
     internal const string SimplifiedChinese = "zh-CN";
     internal const string TraditionalChineseHongKong = "zh-HK";
     internal const string English = "en-US";
+    internal const string PortugueseBrazil = "pt-BR";
 
     private const string DictionaryPrefix = "Localization/Strings.";
     private static readonly string SettingsPath = Path.Combine(
@@ -53,7 +54,7 @@ internal static class LocalizationService
     private static void ApplyLanguage(string language, bool persist, bool notify)
     {
         if (language is not (SystemLanguage or SimplifiedChinese or
-            TraditionalChineseHongKong or English))
+            TraditionalChineseHongKong or English or PortugueseBrazil))
             language = SystemLanguage;
 
         var cultureName = language == SystemLanguage
@@ -105,6 +106,8 @@ internal static class LocalizationService
     {
         if (IsHongKongTraditionalChinese(cultureName))
             return TraditionalChineseHongKong;
+        if (cultureName.StartsWith("pt-BR", StringComparison.OrdinalIgnoreCase))
+            return PortugueseBrazil;
         return cultureName.StartsWith("zh", StringComparison.OrdinalIgnoreCase)
             ? SimplifiedChinese
             : English;
