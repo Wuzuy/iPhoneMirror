@@ -65,7 +65,7 @@
     <system:String x:Key="Close">Fechar</system:String>
     <system:String x:Key="Minimize">Minimizar</system:String>
     <system:String x:Key="Maximize">Maximizar ou restaurar</system:String>
-    <system:String x:Key="Retry">Check again</system:String>
+    <system:String x:Key="Retry">Verificar novamente</system:String>
     <system:String x:Key="Cancel">Cancelar</system:String>
     <system:String x:Key="Continue">Continuar</system:String>
     <system:String x:Key="Acknowledge">Entendi</system:String>
@@ -126,8 +126,8 @@ Only this device's libusb0 filter is changed. Apple's official driver is not rep
     <system:String x:Key="DeviceModelFormat">Modelo {0}</system:String>
     <system:String x:Key="AppleServiceRunning">O serviço USB da Apple está em execução</system:String>
     <system:String x:Key="AppleServiceStopped">O suporte USB da Apple está instalado, mas o serviço está parado</system:String>
-    <system:String x:Key="AppleServiceMissing">The Apple USB driver is installed, but Apple Mobile Device Service is missing</system:String>
-    <system:String x:Key="AppleUsbDriverMissing">Apple Mobile Device Service is installed, but the Apple USB driver package is missing</system:String>
+    <system:String x:Key="AppleServiceMissing">O driver USB da Apple está instalado, mas o Serviço de Dispositivo Móvel da Apple está ausente</system:String>
+    <system:String x:Key="AppleUsbDriverMissing">O Serviço de Dispositivo Móvel da Apple está instalado, mas o pacote de driver USB da Apple está ausente</system:String>
     <system:String x:Key="AppleSupportMissing">Apple Devices ou Apple Mobile Device Support não foi encontrado</system:String>
     <system:String x:Key="LibUsbMissing">O serviço compartilhado libusb0 não está instalado</system:String>
     <system:String x:Key="LibUsbFilesMismatch">Os arquivos libusb0 estão ausentes ou não correspondem à versão confiável</system:String>
@@ -143,18 +143,18 @@ Only this device's libusb0 filter is changed. Apple's official driver is not rep
     <system:String x:Key="ElevatedProcessNoResult">O processo de driver elevado saiu com o código {0} sem retornar um resultado.</system:String>
     <system:String x:Key="ElevatedInvalidResult">O processo de driver elevado retornou um resultado inválido.</system:String>
     <system:String x:Key="UacCancelled">A aprovação do administrador do Windows foi cancelada.</system:String>
-    <system:String x:Key="OfflineMsiFailed">The offline AppleMobileDeviceSupport MSI failed with exit code {0}.
+    <system:String x:Key="OfflineMsiFailed">O MSI offline do AppleMobileDeviceSupport falhou com o código de saída {0}.
 {1}
 Log: {2}</system:String>
     <system:String x:Key="AppleDownloadUnavailable">O instalador oficial da Apple não pôde ser obtido automaticamente. A página do Apple Devices foi aberta na Microsoft Store.</system:String>
     <system:String x:Key="AppleCompatibilityDownloadUnavailable">O componente de compatibilidade do Apple Mobile Device Service não pôde ser baixado. Verifique a rede e tente novamente; os detalhes foram gravados no log.</system:String>
     <system:String x:Key="AppleSignatureInvalid">O instalador da Apple falhou na validação de assinatura do Windows e não foi executado.</system:String>
-    <system:String x:Key="AppleInstallerFailed">The Apple Mobile Device Support component failed with exit code {0}.
+    <system:String x:Key="AppleInstallerFailed">O componente Apple Mobile Device Support falhou com o código de saída {0}.
 {1}
 Log: {2}</system:String>
-    <system:String x:Key="AppleRestartRequired">Apple Mobile Device Support was installed, but Windows must restart to finish registering the driver and service. Restart the PC, then check again.
+    <system:String x:Key="AppleRestartRequired">O Apple Mobile Device Support foi instalado, mas o Windows precisa reiniciar para concluir o registro do driver e serviço. Reinicie o PC e verifique novamente.
 Log: {0}</system:String>
-    <system:String x:Key="AppleServiceNotReady">Apple USB support is incomplete: the service or Apple USB driver package is not ready. Connect and unlock the iPhone, then check again.
+    <system:String x:Key="AppleServiceNotReady">O suporte USB da Apple está incompleto: o serviço ou o pacote de driver USB da Apple não está pronto. Conecte e desbloqueie o iPhone e verifique novamente.
 Log: {0}</system:String>
     <system:String x:Key="Appearance">Aparência</system:String>
     <system:String x:Key="ThemeSystem">Usar configuração do sistema</system:String>

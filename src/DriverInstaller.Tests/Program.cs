@@ -21,6 +21,8 @@ Run("localized culture mapping", () =>
         DriverLocalization.ResolveCultureName("zh-SG"));
     Equal(DriverLocalization.English,
         DriverLocalization.ResolveCultureName("de-DE"));
+    Equal(DriverLocalization.PortugueseBrazil,
+        DriverLocalization.ResolveCultureName("pt-BR"));
 });
 
 Run("advanced mode exposes forced driver cleanup", () =>

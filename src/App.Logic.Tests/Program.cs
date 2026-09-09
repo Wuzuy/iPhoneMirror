@@ -159,6 +159,7 @@ foreach (var localizationPath in Directory.GetFiles(
             "CaptureNoPingRecovery", StringComparison.Ordinal)).Value;
     Equal(true,
         noPingRecovery.Contains("Restart", StringComparison.OrdinalIgnoreCase) ||
+        noPingRecovery.Contains("Reinicie", StringComparison.OrdinalIgnoreCase) ||
         noPingRecovery.Contains("重启", StringComparison.Ordinal) ||
         noPingRecovery.Contains("重新啟動", StringComparison.Ordinal),
         $"no-PING recovery asks the user to restart in {Path.GetFileName(localizationPath)}");
@@ -188,11 +189,13 @@ foreach (var localizationPath in Directory.GetFiles(
             "CaptureUsbConfigurationRecovery", StringComparison.Ordinal)).Value;
     Equal(true,
         usbRecovery.Contains("restart", StringComparison.OrdinalIgnoreCase) ||
+        usbRecovery.Contains("Reinicie", StringComparison.OrdinalIgnoreCase) ||
         usbRecovery.Contains("重启", StringComparison.Ordinal) ||
         usbRecovery.Contains("重新啟動", StringComparison.Ordinal),
         $"USB recovery asks the user to restart in {Path.GetFileName(localizationPath)}");
     Equal(true,
         usbRecovery.Contains("cable", StringComparison.OrdinalIgnoreCase) ||
+        usbRecovery.Contains("cabo", StringComparison.OrdinalIgnoreCase) ||
         usbRecovery.Contains("数据线", StringComparison.Ordinal) ||
         usbRecovery.Contains("傳輸線", StringComparison.Ordinal),
         $"USB recovery asks the user to replace/reconnect a cable in {Path.GetFileName(localizationPath)}");
@@ -213,6 +216,9 @@ Equal(LocalizationService.SimplifiedChinese,
 Equal(LocalizationService.English,
     LocalizationService.ResolveCultureName("fr-FR"),
     "unsupported system cultures use the English dictionary");
+Equal(LocalizationService.PortugueseBrazil,
+    LocalizationService.ResolveCultureName("pt-BR"),
+    "Brazilian Portuguese system culture selects the Portuguese (Brazil) dictionary");
 
 var captureRecoveryWindowPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory,
     "..", "..", "..", "..", "App", "Windows", "CaptureRecoveryWindow.xaml"));
@@ -2127,7 +2133,7 @@ Equal(true, CaptureErrorGuidance.IsDeviceSessionClosedWarning(deviceSessionClose
 Equal(false, CaptureErrorGuidance.IsDeviceSessionClosedWarning(
         deviceSessionClosedStatus with { ErrorCode = -2110 }),
     "USB disconnects do not use the phone-side stop warning presentation");
-foreach (var cultureFile in new[] { "Strings.zh-CN.xaml", "Strings.zh-HK.xaml", "Strings.en-US.xaml" })
+foreach (var cultureFile in new[] { "Strings.zh-CN.xaml", "Strings.zh-HK.xaml", "Strings.en-US.xaml", "Strings.pt-BR.xaml" })
 {
     Equal(true, File.ReadAllText(Path.Combine(sourceDirectory, "App", "Localization", cultureFile))
             .Contains("DeviceSessionClosedWarningTitleFormat", StringComparison.Ordinal) &&

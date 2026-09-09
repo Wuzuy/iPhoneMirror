@@ -514,12 +514,32 @@ internal static class Program
         applyLanguage.Invoke(null, ["system", false, false]);
     }
 
+    private static void TestPortugueseLocalizationSwitch(Application application,
+        Assembly assembly)
+    {
+        var localizationService = assembly.GetType(
+            "IPhoneMirror.App.Localization.LocalizationService", throwOnError: true)!;
+        var applyLanguage = localizationService.GetMethod("ApplyLanguage",
+            BindingFlags.Static | BindingFlags.NonPublic) ??
+            throw new MissingMethodException(localizationService.FullName, "ApplyLanguage");
+
+        applyLanguage.Invoke(null, ["pt-BR", false, false]);
+        if (application.TryFindResource("StartMirroring") is not string start ||
+            !start.Contains("Iniciar", StringComparison.OrdinalIgnoreCase) ||
+            application.TryFindResource("NavigationTextFontFamily") is not FontFamily font ||
+            !font.Source.Equals("Segoe UI", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException(
+                "Portuguese (Brazil) localization dictionary did not load at runtime.");
+        applyLanguage.Invoke(null, ["system", false, false]);
+    }
+
     private static void TestUpdateWindowThemeSwitch()
     {
         var application = new App();
         application.InitializeComponent();
         var assembly = typeof(App).Assembly;
         TestHongKongLocalizationSwitch(application, assembly);
+        TestPortugueseLocalizationSwitch(application, assembly);
 
         var parserType = assembly.GetType(
             "IPhoneMirror.App.Updater.ReleaseParser", throwOnError: true)!;
