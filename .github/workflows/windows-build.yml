@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: read
+  actions: write
 
 concurrency:
   group: windows-build-${{ github.ref }}
@@ -67,3 +68,10 @@ jobs:
       - name: Build Release, run tests, and publish Windows x64 output
         shell: pwsh
         run: ./build.ps1 -Configuration Release
+
+      - name: Upload Windows x64 build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: iPhoneMirror-windows-x64-ptBR
+          path: outputs/
+          if-no-files-found: error
